@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CGPMHK — Gestão de Manutenção 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Calibri', 'Helvetica Neue', system-ui, sans-serif; }
+  @media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; background: #fff !important; }
+    [data-no-print] { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+
+/* ═══ LOGOS (base64 embedded) ═══ */
+const LOGO_EEM = "data:image/png;base64,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";
+const LOGO_CGPMHK = "data:image/png;base64,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";
+
+/* ═══════════════════════════════════════════
+   DATA — PAM 2026 CGPMHK
+   ═══════════════════════════════════════════ */
+
+const SYSTEMS = [
+  { id: "CHIL", name: "Chillers Arrefecidos a Água", nameZh: "水冷式冷水機", group: "AVAC" },
+  { id: "BOMB", name: "Bombas de Água", nameZh: "水泵", group: "AVAC" },
+  { id: "TORR", name: "Torres de Arrefecimento", nameZh: "冷卻塔", group: "AVAC" },
+  { id: "SPLI", name: "Unidades de Expansão Directa (SPLIT)", nameZh: "直膨式單位", group: "AVAC" },
+  { id: "VC", name: "Ventiloconvectores (VC)", nameZh: "風機盤管", group: "AVAC" },
+  { id: "UTA", name: "Unidades de Tratamento de Ar (UTA)", nameZh: "空氣處理單位", group: "AVAC", inactive: true },
+];
+
+// Monthly plan - day numbers per month for each system
+const PAM_MENSAL = {
+  CHIL: { Jan: [22], Fev: [25,26,27], Mar: [20], Abr: [16], Mai: [14], Jun: [18], Jul: [16], Ago: [13], Set: [17], Out: [15], Nov: [19], Dez: [17] },
+  BOMB: { Jan: [22,23], Fev: [], Mar: [20], Abr: [16,17], Mai: [14,15], Jun: [18,19], Jul: [16,17], Ago: [13,14], Set: [17,18], Out: [15,16], Nov: [19,20], Dez: [17,18] },
+  TORR: { Jan: [23], Fev: [25,26,27], Mar: [20], Abr: [17], Mai: [15], Jun: [19], Jul: [17], Ago: [14], Set: [18], Out: [16], Nov: [20], Dez: [18] },
+  SPLI: { Jan: [19], Fev: [], Mar: [19], Abr: [13], Mai: [11], Jun: [15], Jul: [13], Ago: [10], Set: [14], Out: [12], Nov: [16], Dez: [14] },
+  VC:   { Jan: [20,31], Fev: [], Mar: [19], Abr: [14], Mai: [12], Jun: [16], Jul: [14], Ago: [11], Set: [15], Out: [13], Nov: [17], Dez: [15] },
+  UTA:  { Jan: [], Fev: [], Mar: [], Abr: [], Mai: [], Jun: [], Jul: [], Ago: [], Set: [], Out: [], Nov: [], Dez: [] },
+};
+
+const PAM_TRIMESTRAL = {
+  BOMB: { T1: { Mar: [20] }, T2: { Mai: [14,15] }, T3: { Ago: [13,14] }, T4: { Nov: [19,20] } },
+  SPLI: { T1: { Mar: [19] }, T2: { Jun: [15] }, T3: { Set: [14] }, T4: { Dez: [14] } },
+  VC:   { T1: { Mar: [19] }, T2: { Jun: [16] }, T3: { Set: [15] }, T4: { Dez: [15] } },
+  UTA:  { T1: {}, T2: {}, T3: {}, T4: {} },
+};
+
+const PAM_SEMESTRAL = {
+  CHIL: { S1: { Abr: [16] }, S2: { Out: [15] } },
+  BOMB: { S1: { Abr: [16,17] }, S2: { Out: [15,16] } },
+  TORR: { S1: { Abr: [17] }, S2: { Out: [16] } },
+  SPLI: { S1: { Abr: [13] }, S2: { Out: [12] } },
+  VC:   { S1: { Abr: [14] }, S2: { Out: [13] } },
+  UTA:  { S1: {}, S2: {} },
+};
+
+const MONTH_KEYS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const MONTH_FULL = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const MONTH_NUM = { Jan:"01",Fev:"02",Mar:"03",Abr:"04",Mai:"05",Jun:"06",Jul:"07",Ago:"08",Set:"09",Out:"10",Nov:"11",Dez:"12" };
+
+const TODAY = "2026-03-27";
+
+const WORK_ORDERS_INIT = [
+  { id:1, os:"260001", date:"2026-01-20", item:"SPLI", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Substituição de peças", notes:"Daikin 2HP cassette AC — dano no painel (Sala de Servidor GF).", disposition:"Apto para serviço", hasIssue:true },
+  { id:2, os:"260001", date:"2026-01-20", item:"VC", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"", disposition:"Agendar próxima corretiva", hasIssue:false },
+  { id:3, os:"260001", date:"2026-01-31", item:"VC", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"", disposition:"Agendar próxima preventiva", hasIssue:false },
+  { id:4, os:"260002", date:"2026-01-22", item:"TORR", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Substituição de peças", notes:"Motor do ventilador da torre solto (Item B-82). Mantas de absorção sonora envelhecidas e sem efeito.", disposition:"Substituição de peças", hasIssue:true },
+  { id:5, os:"260003", date:"2026-01-22", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"Bomba de água de arrefecimento com fissuras no ponto de amortecimento de vibração (Três).", disposition:"Direcionar para descarte", hasIssue:true },
+  { id:6, os:"260004", date:"2026-01-22", item:"CHIL", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"CHIL2, Cave, Nº CP2, CP3 — Compressor danificado.", disposition:"", hasIssue:true },
+  { id:7, os:"260005", date:"2026-01-22", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"", disposition:"", hasIssue:false },
+  { id:8, os:"260006", date:"2026-02-26", item:"SPLI", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:9, os:"260006", date:"2026-02-27", item:"VC", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:10, os:"260007", date:"2026-02-28", item:"TORR", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:11, os:"260008", date:"2026-02-28", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:12, os:"260009", date:"2026-02-28", item:"CHIL", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:13, os:"260010", date:"2026-02-28", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:14, os:"260011", date:"2026-02-25", item:"TORR", freq:"—", type:"Corretiva", status:"Realizada", parts:"", conclusion:"", notes:"Incidente de 25/02: Disparo da válvula de segurança do chiller 30HK225A900E devido a inoperacionalidade das torres.", disposition:"", hasIssue:true },
+  { id:15, os:"260012", date:"2026-03-19", item:"SPLI", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:16, os:"260013", date:"2026-03-19", item:"VC", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:17, os:"260014", date:"2026-03-20", item:"CHIL", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:18, os:"260015", date:"2026-03-20", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:19, os:"260016", date:"2026-03-20", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:20, os:"260017", date:"2026-03-20", item:"TORR", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:21, os:"260015", date:"2026-03-20", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:22, os:"260016", date:"2026-03-20", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:23, os:"260012", date:"2026-03-19", item:"SPLI", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:24, os:"260013", date:"2026-03-19", item:"VC", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+];
+
+const CORRETIVA_MONITORED = [
+  { system: "CHIL", since: "2026-01-22", lastEvent: null, notes: "CHIL2 CP2/CP3 compressor danificado" },
+  { system: "BOMB", since: "2026-01-22", lastEvent: null, notes: "Fissuras no amortecimento de vibração" },
+  { system: "TORR", since: "2026-01-22", lastEvent: "2026-02-25", notes: "Incidente válvula segurança chiller" },
+  { system: "SPLI", since: "2026-01-20", lastEvent: "2026-02-28", notes: "Dano painel AC Daikin" },
+  { system: "VC", since: "2026-01-20", lastEvent: null, notes: "" },
+];
+
+/* ═══ HELPERS ═══ */
+function fmtDate(d) { if(!d) return "—"; const p=d.split("-"); return `${p[2]}/${p[1]}/${p[0]}`; }
+function daysBetween(a,b) { return Math.ceil((new Date(b)-new Date(a))/86400000); }
+function isPast(d) { return d < TODAY; }
+function isThisMonth(d) { return d.substring(0,7) === TODAY.substring(0,7); }
+
+/* ═══ THEME — Excel-faithful light theme ═══ */
+const T = {
+  bg:"#ffffff", s1:"#f8f9fa", s2:"#f0f1f3", s3:"#e8eaed", brd:"#d0d5dd",
+  tx:"#1a1a1a", txM:"#6b7280", txB:"#111111",
+  ac:"#2563eb", acL:"#1d4ed8",
+  gn:"#92D050", gnDk:"#548235",   // Excel green for completed
+  yl:"#FFC000", ylDk:"#BF9000",   // Excel gold/amber
+  or:"#ED7D31", orDk:"#C55A11",   // Excel orange for corrective
+  rd:"#FF0000", rdDk:"#C00000",   // Excel red for cancelled
+  bl:"#4472C4", blDk:"#2F5597",   // Excel blue
+  pu:"#7030A0", cy:"#00B0F0",
+  hdrGn:"#375623",                // Dark green header bar
+  hdrGrey:"#A6A6A6",              // Grey header row
+};
+const ff = "'Segoe UI', 'Calibri', 'Helvetica Neue', system-ui, sans-serif";
+
+/* ═══ COMPONENTS ═══ */
+const Badge = ({children, color, bg}) => (
+  <span style={{padding:"2px 8px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:0.5,color,background:bg,textTransform:"uppercase",whiteSpace:"nowrap"}}>{children}</span>
+);
+const Dot = ({color, label}) => (
+  <span style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:13,fontWeight:600,color}}>
+    <span style={{width:7,height:7,borderRadius:"50%",background:color,boxShadow:`0 0 6px ${color}50`}}/>{label}
+  </span>
+);
+
+export default function App() {
+  const [tab, setTab] = useState("painel");
+  const [wo, setWo] = useState(WORK_ORDERS_INIT);
+  const [fStatus, setFS] = useState("all");
+  const [fType, setFT] = useState("all");
+  const [fEquip, setFE] = useState("all");
+  const [fMonth, setFM] = useState("all");
+  const [expanded, setExpanded] = useState(null);
+  const [dateEdits, setDateEdits] = useState({});
+  const [editing, setEditing] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingWo, setEditingWo] = useState(null);
+  const [cellStatuses, setCellStatuses] = useState(() => {
+    // Pre-populate completed cells from work order data
+    const init = {};
+    const completedCombos = {};
+    WORK_ORDERS_INIT.forEach(w => {
+      if(w.status==="Realizada") {
+        const mi = parseInt(w.date.split("-")[1])-1;
+        const mk = MONTH_KEYS[mi];
+        const freq = w.freq === "—" ? null : w.freq;
+        if(freq) init[`${w.item}_${freq}_${mk}`] = "completed";
+        if(w.type==="Corretiva" && freq) init[`${w.item}_${freq||"Mensal"}_${mk}`] = "corrective";
+      }
+      if(w.status==="Cancelada") {
+        const mi = parseInt(w.date.split("-")[1])-1;
+        const mk = MONTH_KEYS[mi];
+        const freq = w.freq === "—" ? "Mensal" : w.freq;
+        init[`${w.item}_${freq}_${mk}`] = "cancelled";
+      }
+    });
+    return init;
+  });
+
+  const setCellStatus = useCallback((cellKey, status) => {
+    setCellStatuses(prev => ({...prev, [cellKey]: status}));
+  },[]);
+  const [newWo, setNewWo] = useState({os:"",date:"",item:"CHIL",type:"Preventiva",freq:"Mensal",status:"Agendada",notes:""});
+
+  /* Stats */
+  const stats = useMemo(() => {
+    const d=wo.filter(w=>w.status==="Realizada").length, s=wo.filter(w=>w.status==="Agendada").length, can=wo.filter(w=>w.status==="Cancelada").length;
+    const p=wo.filter(w=>w.type==="Preventiva").length, c=wo.filter(w=>w.type==="Corretiva").length, pred=wo.filter(w=>w.type==="Preditiva").length;
+    const iss=wo.filter(w=>w.hasIssue).length;
+    return {total:wo.length,done:d,sched:s,cancel:can,prev:p,corr:c,pred:pred,issues:iss};
+  },[wo]);
+
+  const monthStats = useMemo(() => MONTH_FULL.map((m,i) => {
+    const items = wo.filter(w=>w.date.split("-")[1]===String(i+1).padStart(2,"0"));
+    return {month:m,short:MONTH_KEYS[i],total:items.length,done:items.filter(w=>w.status==="Realizada").length,sched:items.filter(w=>w.status==="Agendada").length,cancel:items.filter(w=>w.status==="Cancelada").length,prev:items.filter(w=>w.type==="Preventiva").length,corr:items.filter(w=>w.type==="Corretiva").length,pred:items.filter(w=>w.type==="Preditiva").length};
+  }),[wo]);
+
+  const filtered = useMemo(() => wo.filter(w => {
+    if(fStatus!=="all"&&w.status!==fStatus) return false;
+    if(fType!=="all"&&w.type!==fType) return false;
+    if(fEquip!=="all"&&w.item!==fEquip) return false;
+    if(fMonth!=="all") { const mi=MONTH_FULL.indexOf(fMonth); if(parseInt(w.date.split("-")[1])!==mi+1) return false; }
+    return true;
+  }),[wo,fStatus,fType,fEquip,fMonth]);
+
+  const issues = useMemo(()=>wo.filter(w=>w.hasIssue&&w.notes),[wo]);
+
+  /* PAM with overrides */
+  const getPamDays = useCallback((sysId, monthKey, freq) => {
+    const key = `${sysId}_${freq}_${monthKey}`;
+    if (dateEdits[key]) return dateEdits[key];
+    if (freq==="Mensal") return PAM_MENSAL[sysId]?.[monthKey] || [];
+    if (freq==="Trimestral") {
+      const q = PAM_TRIMESTRAL[sysId];
+      if(!q) return [];
+      for(const t of ["T1","T2","T3","T4"]) { if(q[t]?.[monthKey]) return q[t][monthKey]; }
+      return [];
+    }
+    if (freq==="Semestral") {
+      const s = PAM_SEMESTRAL[sysId];
+      if(!s) return [];
+      for(const sem of ["S1","S2"]) { if(s[sem]?.[monthKey]) return s[sem][monthKey]; }
+      return [];
+    }
+    return [];
+  },[dateEdits]);
+
+  const saveDateEdit = useCallback((sysId, freq, monthKey, newDays) => {
+    const key = `${sysId}_${freq}_${monthKey}`;
+    setDateEdits(prev => ({...prev, [key]: newDays}));
+    setEditing(null);
+  },[]);
+
+  const addOrder = useCallback(() => {
+    if(!newWo.os||!newWo.date) return;
+    setWo(prev => [...prev, {...newWo, id:prev.length+1, parts:"", conclusion:"", disposition:"", hasIssue:newWo.type==="Corretiva"}]);
+    setNewWo({os:"",date:"",item:"CHIL",type:"Preventiva",freq:"Mensal",status:"Agendada",notes:""});
+    setShowAdd(false);
+  },[newWo]);
+
+  const updateField = useCallback((id, field, value) => {
+    setWo(prev => prev.map(w => w.id===id ? {...w, [field]: value, hasIssue: field==="type" ? value==="Corretiva" : w.hasIssue} : w));
+  },[]);
+
+  const startEditWo = useCallback((w) => {
+    setEditingWo(w.id);
+  },[]);
+
+  const stopEditWo = useCallback(() => {
+    setEditingWo(null);
+  },[]);
+
+  /* Upcoming from PAM */
+  const upcoming = useMemo(() => {
+    const items = [];
+    const todayMonth = parseInt(TODAY.split("-")[1]);
+    const todayDay = parseInt(TODAY.split("-")[2]);
+    SYSTEMS.filter(s=>!s.inactive).forEach(sys => {
+      ["Mensal","Trimestral","Semestral"].forEach(freq => {
+        for(let mi=todayMonth-1; mi<Math.min(todayMonth+1,12); mi++) {
+          const mk = MONTH_KEYS[mi];
+          const days = getPamDays(sys.id, mk, freq);
+          days.forEach(d => {
+            const dateStr = `2026-${String(mi+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+            const diff = daysBetween(TODAY, dateStr);
+            if(diff > 0 && diff <= 45) items.push({system:sys.id,name:sys.name,freq,date:dateStr,daysLeft:diff});
+          });
+        }
+      });
+    });
+    return items.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,10);
+  },[getPamDays]);
+
+  const maxBar = Math.max(...monthStats.map(m=>m.total),1);
+
+  /* Donut */
+  const Donut = ({data, size=90, thick=12}) => {
+    const total = data.reduce((s,d)=>s+d.v,0);
+    if(!total) return null;
+    const r=(size-thick)/2, circ=2*Math.PI*r;
+    let off=0;
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={T.brd} strokeWidth={thick}/>
+        {data.map((d,i) => {
+          const dash=circ*d.v/total, gap=circ-dash;
+          const el = <circle key={i} cx={size/2} cy={size/2} r={r} fill="none" stroke={d.c} strokeWidth={thick} strokeDasharray={`${dash} ${gap}`} strokeDashoffset={-off} transform={`rotate(-90 ${size/2} ${size/2})`}/>;
+          off+=dash; return el;
+        })}
+        <text x={size/2} y={size/2-4} textAnchor="middle" fill={T.txB} fontSize="15" fontWeight="800" fontFamily={ff}>{total}</text>
+        <text x={size/2} y={size/2+10} textAnchor="middle" fill={T.txM} fontSize="8" fontFamily={ff}>total</text>
+      </svg>
+    );
+  };
+
+  const sel = (v,fn,opts) => <select value={v} onChange={e=>fn(e.target.value)} style={{padding:"6px 10px",borderRadius:4,border:`1px solid ${T.brd}`,background:"#fff",color:T.tx,fontSize:13,fontFamily:ff,cursor:"pointer"}}>{opts.map(([val,lab])=><option key={val} value={val}>{lab}</option>)}</select>;
+
+  const tabBtn = (id,label) => <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 16px",cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.6,textTransform:"uppercase",border:"none",background:tab===id?"#fff":T.s2,color:tab===id?T.hdrGn:T.txM,borderBottom:tab===id?`3px solid ${T.hdrGn}`:"3px solid transparent",borderRadius:"5px 5px 0 0",fontFamily:ff,transition:"all 0.15s"}}>{label}</button>;
+
+  const card = (lbl,val,color,sub) => (
+    <div style={{background:"#fff",borderRadius:6,padding:"14px 16px",borderLeft:`4px solid ${color}`,flex:"1 1 120px",minWidth:110,boxShadow:"0 1px 3px rgba(0,0,0,0.08)",border:`1px solid ${T.brd}`}}>
+      <div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>{lbl}</div>
+      <div style={{fontSize:24,fontWeight:800,color}}>{val}</div>
+      {sub&&<div style={{fontSize:13,color:T.txM,marginTop:2}}>{sub}</div>}
+    </div>
+  );
+
+  const inputSt = {padding:"6px 10px",borderRadius:4,border:`1px solid ${T.brd}`,background:"#fff",color:T.tx,fontSize:13,fontFamily:ff,width:"100%",boxSizing:"border-box"};
+
+  /* Check if a month/system combo is completed based on work orders */
+  const handlePrint = useCallback((scope) => {
+    const style = document.createElement('style');
+    style.setAttribute('data-print','1');
+    style.textContent = `
+      @media print {
+        @page { size: A4 landscape; margin: 8mm; }
+        body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+        [data-no-print] { display: none !important; }
+        [data-tab] { display: none !important; }
+        ${scope === "all"
+          ? `[data-tab] { display: block !important; page-break-after: always; }`
+          : `[data-tab="${scope}"] { display: block !important; }`
+        }
+        table { font-size: 9px !important; }
+        button { display: none !important; }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => { document.querySelectorAll('style[data-print]').forEach(s=>s.remove()); }, 500);
+  },[]);
+
+  return (
+    <div style={{fontFamily:ff,background:"#f5f5f5",color:T.tx,minHeight:"100vh",padding:"0",lineHeight:1.4}}>
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; background: #fff !important; }
+          [data-no-print] { display: none !important; }
+        }
+      `}</style>
+
+      {/* Header — faithful to Excel */}
+      <div style={{marginBottom:0,background:"#fff",padding:"12px 20px 0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          {/* Left — EEM Logo */}
+          <div style={{display:"flex",alignItems:"center",gap:12,minWidth:260}}>
+            <img src={LOGO_EEM} alt="Empresa Eléctrica, Lda." style={{height:48,objectFit:"contain"}} />
+            <div style={{fontSize:13,color:"#555",lineHeight:1.6,fontFamily:"Arial, sans-serif"}}>
+              Avenida Comercial de Macau,<br/>nºs 251A-301, Macau REAM<br/>
+              Telefone: (+853) 2878 3996/8<br/>Fax: (+853) 2832 1330
+            </div>
+          </div>
+          {/* Center — Title */}
+          <div style={{textAlign:"center",flex:1,padding:"0 20px"}}>
+            <h1 style={{margin:0,fontSize:24,fontWeight:800,color:"#111",fontFamily:"Georgia, 'Times New Roman', serif"}}>Consulado Geral de Portugal em Macau e Hong Kong</h1>
+            <p style={{margin:"4px 0 0",fontSize:16,color:"#333",fontFamily:"SimSun, STSong, serif"}}>葡萄牙駐澳門及香港總領事館</p>
+          </div>
+          {/* Right — CGPMHK Logo */}
+          <div style={{minWidth:180,display:"flex",justifyContent:"flex-end"}}>
+            <img src={LOGO_CGPMHK} alt="Consulado Geral de Portugal em Macau e Hong Kong" style={{height:48,objectFit:"contain"}} />
+          </div>
+        </div>
+        {/* Sub-header bar — GREY */}
+        <div style={{background:"#808080",color:"#fff",padding:"7px 14px",marginTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:13,fontWeight:700,letterSpacing:0.5}}>PLANO GERAL DE MANUTENÇÃO ANUAL 年度一般維護計劃</span>
+          <span style={{fontSize:10}}>Última actualização: &nbsp;{fmtDate(TODAY)}</span>
+        </div>
+      </div>
+
+      {/* Tabs + Print buttons */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#fff",padding:"0 16px",borderBottom:`1px solid ${T.brd}`}} data-no-print>
+        <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>{[["painel","Painel Geral"],["os","Ordens de Serviço"],["plano","Plano Anual"],["ativos","Ativos Monitorados"],["analise","Análise"]].map(([id,l])=>tabBtn(id,l))}</div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button onClick={()=>handlePrint(tab)} style={{padding:"6px 12px",border:`1px solid ${T.brd}`,borderRadius:4,background:"#fff",color:"#333",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ff,display:"flex",alignItems:"center",gap:4}}>
+            🖨 Imprimir tab actual
+          </button>
+          <button onClick={()=>handlePrint("all")} style={{padding:"6px 12px",border:`1px solid ${T.hdrGn}`,borderRadius:4,background:T.hdrGn,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ff,display:"flex",alignItems:"center",gap:4}}>
+            🖨 Imprimir tudo (A4)
+          </button>
+        </div>
+      </div>
+      <div style={{padding:"16px 16px"}}>
+
+      {/* ═══ PAINEL GERAL ═══ */}
+      {tab==="painel"&&<div data-tab="painel">
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
+          {card("Total OS",stats.total,T.ac)}
+          {card("Realizadas",stats.done,T.gn,`${Math.round(stats.done/stats.total*100)}%`)}
+          {card("Agendadas",stats.sched,T.yl)}
+          {card("Canceladas",stats.cancel,T.rd)}
+          {card("Preventivas",stats.prev,T.bl)}
+          {card("Corretivas",stats.corr,T.rd)}
+          {card("Preditivas",stats.pred,T.pu)}
+          {card("Alertas",stats.issues,T.or)}
+        </div>
+
+        <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:1,marginBottom:14}}>Manutenções por Mês — 2026</div>
+          <div style={{display:"flex",gap:4,alignItems:"flex-end",height:110}}>
+            {monthStats.map((m,i) => (
+              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                {m.total>0&&<span style={{fontSize:13,fontWeight:700,color:T.txB}}>{m.total}</span>}
+                <div style={{width:"100%",display:"flex",gap:1,alignItems:"flex-end",height:85}}>
+                  <div style={{flex:1,borderRadius:"2px 2px 0 0",height:`${(m.prev/maxBar)*100}%`,background:T.bl,minHeight:m.prev>0?3:0}}/>
+                  {m.corr>0&&<div style={{flex:1,borderRadius:"2px 2px 0 0",height:`${(m.corr/maxBar)*100}%`,background:T.rd,minHeight:3}}/>}
+                  {m.pred>0&&<div style={{flex:1,borderRadius:"2px 2px 0 0",height:`${(m.pred/maxBar)*100}%`,background:T.pu,minHeight:3}}/>}
+                </div>
+                <span style={{fontSize:13,color:T.txM,fontWeight:600}}>{m.short}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:14,marginTop:10,justifyContent:"center"}}>
+            {[[T.bl,"Preventiva"],[T.rd,"Corretiva"],[T.pu,"Preditiva"]].map(([c,l])=><span key={l} style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:T.txM}}><span style={{width:7,height:7,borderRadius:2,background:c}}/>{l}</span>)}
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          {/* Upcoming */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.yl,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>⏱ Próximas Manutenções</div>
+            {upcoming.length===0&&<p style={{fontSize:13,color:T.txM}}>Sem manutenções próximas.</p>}
+            {upcoming.map((u,i) => {
+              const uc = u.daysLeft<=7?T.rd:u.daysLeft<=21?T.or:T.yl;
+              return <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<upcoming.length-1?`1px solid ${T.brd}`:"none"}}>
+                <div><span style={{fontSize:13,fontWeight:700,color:T.txB}}>{u.system}</span><span style={{fontSize:13,color:T.txM,marginLeft:6}}>{u.freq}</span><span style={{fontSize:13,color:T.txM,marginLeft:6}}>{fmtDate(u.date)}</span></div>
+                <span style={{fontSize:13,fontWeight:700,color:uc,background:`${uc}15`,padding:"2px 7px",borderRadius:3}}>{u.daysLeft}d</span>
+              </div>;
+            })}
+          </div>
+          {/* Issues */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.or,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>⚠ Alertas Activos</div>
+            {issues.map((w,i) => (
+              <div key={i} style={{padding:"8px 10px",marginBottom:6,borderRadius:6,background:"#f8f9fa",border:`1px solid ${T.brd}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:13,fontWeight:700,color:T.txB}}>OS#{w.os} — {w.item}</span>
+                  <span style={{fontSize:13,color:T.txM}}>{fmtDate(w.date)}</span>
+                </div>
+                <p style={{margin:0,fontSize:13,color:T.txM,lineHeight:1.5}}>{w.notes}</p>
+                {w.disposition&&<div style={{marginTop:4,fontSize:13,color:T.yl}}>→ {w.disposition}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>}
+
+      {/* ═══ ORDENS DE SERVIÇO ═══ */}
+      {tab==="os"&&<div data-tab="os">
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
+          {sel(fStatus,setFS,[["all","Todos os estados"],["Realizada","Realizada"],["Agendada","Agendada"],["Cancelada","Cancelada"]])}
+          {sel(fType,setFT,[["all","Todos os tipos"],["Preventiva","Preventiva"],["Corretiva","Corretiva"],["Preditiva","Preditiva"]])}
+          {sel(fEquip,setFE,[["all","Todos os equipamentos"],...SYSTEMS.map(s=>[s.id,s.id])])}
+          {sel(fMonth,setFM,[["all","Todos os meses"],...MONTH_FULL.map(m=>[m,m])])}
+          <span style={{fontSize:13,color:T.txM,marginLeft:4}}>{filtered.length}/{wo.length} registos</span>
+          <button onClick={()=>setShowAdd(!showAdd)} style={{marginLeft:"auto",padding:"6px 12px",borderRadius:5,border:`1px solid ${T.ac}`,background:"transparent",color:T.ac,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff}}>+ Nova OS</button>
+        </div>
+
+        {showAdd&&<div style={{background:"#f0f1f3",borderRadius:8,padding:14,marginBottom:14,display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr auto",gap:8,alignItems:"end"}}>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>OS#</div><input value={newWo.os} onChange={e=>setNewWo(p=>({...p,os:e.target.value}))} style={inputSt} placeholder="260018"/></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Data</div><input type="date" value={newWo.date} onChange={e=>setNewWo(p=>({...p,date:e.target.value}))} style={inputSt}/></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Sistema</div><select value={newWo.item} onChange={e=>setNewWo(p=>({...p,item:e.target.value}))} style={inputSt}>{SYSTEMS.map(s=><option key={s.id} value={s.id}>{s.id}</option>)}</select></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Tipo</div><select value={newWo.type} onChange={e=>setNewWo(p=>({...p,type:e.target.value}))} style={inputSt}><option>Preventiva</option><option>Corretiva</option><option>Preditiva</option></select></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Frequência</div><select value={newWo.freq} onChange={e=>setNewWo(p=>({...p,freq:e.target.value}))} style={inputSt}><option>Mensal</option><option>Trimestral</option><option>Semestral</option><option>—</option></select></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Estado</div><select value={newWo.status} onChange={e=>setNewWo(p=>({...p,status:e.target.value}))} style={inputSt}><option>Agendada</option><option>Realizada</option><option>Cancelada</option></select></div>
+          <button onClick={addOrder} style={{padding:"6px 14px",borderRadius:5,border:"none",background:T.gn,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,height:30}}>Guardar</button>
+        </div>}
+
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"separate",borderSpacing:"0 3px",fontSize:11}}>
+            <thead><tr>
+              {["OS#","Data","Sistema","Freq.","Tipo","Estado","Notas",""].map(h=><th key={h} style={{textAlign:"left",padding:"6px 10px",fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,fontWeight:700,borderBottom:`1px solid ${T.brd}`}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{filtered.map((w,i)=>{
+              const isEd = editingWo===w.id;
+              const edSt = {...inputSt,padding:"4px 6px",fontSize:13,width:"auto"};
+              return [
+              <tr key={w.id} style={{background:w.status==="Cancelada"?"#fff0f0":w.hasIssue?"#fff8f0":"#fff",borderBottom:`1px solid ${T.brd}`}}>
+                <td style={{padding:"8px 10px",fontWeight:700,color:T.txB,borderRadius:"6px 0 0 6px",borderLeft:w.status==="Cancelada"?`3px solid ${T.rd}`:w.hasIssue?`3px solid ${T.or}`:"3px solid transparent"}}>
+                  {isEd?<input value={w.os} onChange={e=>updateField(w.id,"os",e.target.value)} style={{...edSt,width:65}}/>:w.os}
+                </td>
+                <td style={{padding:"8px 10px",color:T.txM}}>
+                  {isEd?<input type="date" value={w.date} onChange={e=>updateField(w.id,"date",e.target.value)} style={{...edSt,width:120}}/>:fmtDate(w.date)}
+                </td>
+                <td style={{padding:"8px 10px",fontWeight:600,color:T.tx}}>
+                  {isEd?<select value={w.item} onChange={e=>updateField(w.id,"item",e.target.value)} style={edSt}>{SYSTEMS.map(s=><option key={s.id} value={s.id}>{s.id}</option>)}</select>:w.item}
+                </td>
+                <td style={{padding:"8px 10px"}}>
+                  {isEd?<select value={w.freq} onChange={e=>updateField(w.id,"freq",e.target.value)} style={edSt}><option>Mensal</option><option>Trimestral</option><option>Semestral</option><option>—</option></select>:<Badge color={T.cy} bg={`${T.cy}18`}>{w.freq}</Badge>}
+                </td>
+                <td style={{padding:"8px 10px"}}>
+                  {isEd?<select value={w.type} onChange={e=>updateField(w.id,"type",e.target.value)} style={edSt}><option>Preventiva</option><option>Corretiva</option><option>Preditiva</option></select>:<Badge color={w.type==="Corretiva"?T.rd:w.type==="Preditiva"?T.pu:T.bl} bg={w.type==="Corretiva"?`${T.rd}18`:w.type==="Preditiva"?`${T.pu}18`:`${T.bl}18`}>{w.type}</Badge>}
+                </td>
+                <td style={{padding:"8px 10px"}}>
+                  {isEd?<select value={w.status} onChange={e=>updateField(w.id,"status",e.target.value)} style={edSt}><option>Agendada</option><option>Realizada</option><option>Cancelada</option></select>:<Dot color={w.status==="Realizada"?T.gn:w.status==="Cancelada"?T.rd:T.yl} label={w.status}/>}
+                </td>
+                <td style={{padding:"8px 10px",color:T.txM,maxWidth:180,fontSize:10}}>
+                  {isEd?<input value={w.notes} onChange={e=>updateField(w.id,"notes",e.target.value)} style={{...edSt,width:"100%"}} placeholder="Notas..."/>:(w.notes?<span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{w.notes}</span>:"—")}
+                </td>
+                <td style={{padding:"8px 10px",borderRadius:"0 6px 6px 0",whiteSpace:"nowrap"}}>
+                  <div style={{display:"flex",gap:4}}>
+                    <button onClick={()=>isEd?stopEditWo():startEditWo(w)} style={{background:"transparent",border:`1px solid ${isEd?T.gn:T.ac}`,color:isEd?T.gn:T.ac,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:ff}}>{isEd?"✓ OK":"✎ Editar"}</button>
+                    {!isEd&&w.notes&&<button onClick={()=>setExpanded(expanded===w.id?null:w.id)} style={{background:"transparent",border:`1px solid ${T.brd}`,color:T.txM,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:ff}}>{expanded===w.id?"−":"+"}</button>}
+                  </div>
+                </td>
+              </tr>,
+              expanded===w.id&&w.notes?<tr key={`n-${w.id}`}><td colSpan={8} style={{padding:"10px 14px",background:"#f8f9fa",borderRadius:6,fontSize:13,color:T.tx,lineHeight:1.6,borderLeft:`3px solid ${T.ac}`}}>
+                <b style={{color:T.ac}}>Notas:</b> {w.notes}
+                {isEd&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+                  <div><span style={{fontSize:13,color:T.txM}}>Conclusão</span><input value={w.conclusion||""} onChange={e=>updateField(w.id,"conclusion",e.target.value)} style={{...inputSt,marginTop:2}}/></div>
+                  <div><span style={{fontSize:13,color:T.txM}}>Disposição</span><input value={w.disposition||""} onChange={e=>updateField(w.id,"disposition",e.target.value)} style={{...inputSt,marginTop:2}}/></div>
+                  <div><span style={{fontSize:13,color:T.txM}}>Peças Substituídas</span><select value={w.parts||""} onChange={e=>updateField(w.id,"parts",e.target.value)} style={{...inputSt,marginTop:2}}><option value="">—</option><option>Não</option><option>Sim</option></select></div>
+                </div>}
+                {!isEd&&w.conclusion&&<><br/><b style={{color:T.yl}}>Conclusão:</b> {w.conclusion}</>}
+                {!isEd&&w.disposition&&<><br/><b style={{color:T.gn}}>Disposição:</b> {w.disposition}</>}
+              </td></tr>:null
+              ];
+            })}
+            </tbody>
+          </table>
+        </div>
+      </div>}
+
+      {/* ═══ PLANO ANUAL ═══ */}
+      {tab==="plano"&&<div data-tab="plano">
+        {[
+          {freq:"Mensal", label:"ACTIVIDADES MENSAIS 每月活動", labelZh:"每月活動",
+           desc:"Medição de parâmetros operacionais, inspeções de segurança, verificações de vazamentos, ruídos, vibrações e isolamento térmico, limpeza básica e registo nas fichas de manutenção.",
+           descZh:"測量操作參數、安全檢查、洩漏驗證、噪音、振動和熱絕緣、基本清潔及記錄日誌",
+           systems: SYSTEMS},
+          {freq:"Trimestral", label:"ACTIVIDADES TRIMESTRAIS 季度活動", labelZh:"季度活動",
+           desc:"Purga e limpeza de strainers, limpeza profunda de filtros e verificação de drenos. Registo nas fichas de manutenção.",
+           descZh:"清洗和清理過濾器，深度清潔濾網，並檢查排水管道。記錄在維護日誌中。",
+           systems: SYSTEMS.filter(s=>["BOMB","SPLI","VC","UTA"].includes(s.id))},
+          {freq:"Semestral", label:"ACTIVIDADES SEMESTRAIS 半年活動", labelZh:"半年活動",
+           desc:"Lubrificação, verificação de fixações, limpeza de coils, inspeção de componentes e registro de observações (além das mensais).",
+           descZh:"潤滑、檢查緊固件、清潔線圈、檢查零件、記錄觀察結果（除每月一次的觀察外）。",
+           systems: SYSTEMS},
+        ].map(section => {
+          const periodHeaders = section.freq==="Trimestral" ? [
+            {label:"TRIMESTRE 1 第一季",span:3,months:["Jan","Fev","Mar"]},
+            {label:"TRIMESTRE 2 第二季",span:3,months:["Abr","Mai","Jun"]},
+            {label:"TRIMESTRE 3 第三季",span:3,months:["Jul","Ago","Set"]},
+            {label:"TRIMESTRE 4 第四季",span:3,months:["Out","Nov","Dez"]},
+          ] : section.freq==="Semestral" ? [
+            {label:"SEMESTRE 1 第一學期",span:6,months:["Jan","Fev","Mar","Abr","Mai","Jun"]},
+            {label:"SEMESTRE 2 第二學期",span:6,months:["Jul","Ago","Set","Out","Nov","Dez"]},
+          ] : null;
+
+          return (
+            <div key={section.freq} style={{marginBottom:24}}>
+              <div style={{fontSize:13,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:0.8,marginBottom:8,padding:"6px 12px",background:"#808080",borderRadius:2}}>{section.label}</div>
+
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+                  {/* Period header row (Trimestre/Semestre) */}
+                  {periodHeaders && <thead><tr>
+                    <th colSpan={3} style={{background:"#D9D9D9"}}/>
+                    {periodHeaders.map((ph,pi) => <th key={pi} colSpan={ph.span} style={{textAlign:"center",padding:"6px 4px",fontSize:13,fontWeight:700,color:"#333",background:"#D9D9D9",borderLeft:`1px solid #bbb`,letterSpacing:0.5}}>{ph.label}</th>)}
+                  </tr></thead>}
+                  <thead><tr>
+                    <th style={{textAlign:"left",padding:"7px 8px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,minWidth:80,position:"sticky",left:0,background:"#D9D9D9",zIndex:2}}>Grupo<br/><span style={{fontWeight:400,fontSize:8}}>團體</span></th>
+                    <th style={{textAlign:"left",padding:"7px 8px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,minWidth:90,position:"sticky",left:80,background:"#D9D9D9",zIndex:2}}>Sistema<br/><span style={{fontWeight:400,fontSize:8}}>系統</span></th>
+                    <th style={{textAlign:"left",padding:"7px 8px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,minWidth:140,maxWidth:180,position:"sticky",left:170,background:"#D9D9D9",zIndex:2}}>Descrição Geral das<br/>Actividades Principais<br/><span style={{fontWeight:400,fontSize:7}}>主要活動概況</span></th>
+                    {MONTH_KEYS.map(m=><th key={m} style={{textAlign:"center",padding:"7px 4px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,background:"#D9D9D9",minWidth:58}}>{m} 26</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {section.systems.map((sys,si) => {
+                      const isFirst = si===0;
+                      const groupRowSpan = isFirst ? section.systems.length : 0;
+
+                      return (
+                        <tr key={`${sys.id}-${section.freq}`}>
+                          {isFirst && <td rowSpan={groupRowSpan} style={{padding:"6px 8px",fontWeight:600,color:T.txM,fontSize:13,lineHeight:1.4,borderBottom:`1px solid ${T.brd}`,verticalAlign:"top",position:"sticky",left:0,background:"#fff",zIndex:1,borderRight:`1px solid ${T.brd}`}}>
+                            Instalações de Aquecimento Ventilação e Ar Condicionado (AVAC)<br/><span style={{fontSize:13,color:T.txM}}>暖氣、通風和空調（HVAC）安裝</span>
+                          </td>}
+                          <td style={{padding:"6px 8px",fontWeight:700,color:T.txB,fontSize:13,borderBottom:`1px solid ${T.brd}`,position:"sticky",left:80,background:"#fff",zIndex:1,borderRight:`1px solid ${T.brd}`}}>
+                            {sys.name}<br/><span style={{fontSize:13,color:T.txM,fontWeight:400}}>{sys.nameZh}</span>
+                          </td>
+                          {isFirst && <td rowSpan={groupRowSpan} style={{padding:"6px 8px",fontSize:13,color:T.txM,lineHeight:1.5,borderBottom:`1px solid ${T.brd}`,verticalAlign:"top",position:"sticky",left:170,background:"#fff",zIndex:1,borderRight:`1px solid ${T.brd}`,maxWidth:180}}>
+                            {section.desc}<br/><span style={{color:`${T.txM}90`}}>{section.descZh}</span>
+                          </td>}
+                          {MONTH_KEYS.map(mk => {
+                            if(sys.inactive) return <td key={mk} style={{textAlign:"center",padding:"4px",color:T.txM,fontSize:13,background:"#fff",borderBottom:`1px solid ${T.brd}`,borderLeft:`1px solid ${T.brd}`}}>(2)</td>;
+
+                            const days = getPamDays(sys.id, mk, section.freq);
+                            const cellKey = `${sys.id}_${section.freq}_${mk}`;
+                            const cellStatus = cellStatuses[cellKey] || "pending";
+                            const isEditingDays = editing === cellKey;
+                            const isCurrent = mk === MONTH_KEYS[parseInt(TODAY.split("-")[1])-1];
+
+                            const bgMap = {
+                              completed: "#92D050",
+                              corrective: "#ED7D31",
+                              predictive: "#7030A0",
+                              cancelled: "#FFC7CE",
+                              pending: isCurrent && days.length > 0 ? "#FFF2CC" : "#fff",
+                            };
+                            const colorMap = {
+                              completed: "#1a1a1a",
+                              corrective: "#fff",
+                              predictive: "#fff",
+                              cancelled: "#C00000",
+                              pending: "#1a1a1a",
+                            };
+
+                            return (
+                              <td key={mk} style={{textAlign:"center",padding:"3px 2px",background:bgMap[cellStatus],borderBottom:`1px solid ${T.brd}`,borderLeft:`1px solid ${T.brd}`,position:"relative",minHeight:28,verticalAlign:"middle"}}>
+                                {days.length > 0 ? (
+                                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                                    {isEditingDays ? (
+                                      <input autoFocus defaultValue={days.join(",")}
+                                        onBlur={e=>{const v=e.target.value.split(",").map(Number).filter(n=>n>0&&n<32);saveDateEdit(sys.id,section.freq,mk,v);}}
+                                        onKeyDown={e=>{if(e.key==="Enter"){const v=e.target.value.split(",").map(Number).filter(n=>n>0&&n<32);saveDateEdit(sys.id,section.freq,mk,v);}if(e.key==="Escape")setEditing(null);}}
+                                        style={{width:42,padding:"2px 3px",border:`1px solid ${T.ac}`,borderRadius:3,background:"#f8f9fa",color:T.txB,fontSize:13,textAlign:"center",fontFamily:ff}}
+                                      />
+                                    ) : (
+                                      <span onClick={()=>setEditing(cellKey)} style={{fontWeight:700,color:colorMap[cellStatus],fontSize:13,cursor:"pointer"}}
+                                        title="Clique para editar dias">{days.join(", ")}</span>
+                                    )}
+                                    {!isEditingDays && (
+                                      <div style={{display:"flex",gap:1}}>
+                                        {[
+                                          {st:"completed",icon:"✓",c:T.gn,tip:"Concluída"},
+                                          {st:"corrective",icon:"⚡",c:T.or,tip:"Corretiva"},
+                                          {st:"predictive",icon:"◆",c:T.pu,tip:"Preditiva"},
+                                          {st:"cancelled",icon:"✕",c:T.rd,tip:"Cancelada"},
+                                          {st:"pending",icon:"○",c:T.txM,tip:"Pendente"},
+                                        ].map(btn => (
+                                          <button key={btn.st} onClick={(e)=>{e.stopPropagation();setCellStatus(cellKey,btn.st);}}
+                                            title={btn.tip}
+                                            style={{
+                                              width:16,height:14,padding:0,border:"none",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,
+                                              background:cellStatus===btn.st?`${btn.c}40`:"transparent",
+                                              color:cellStatus===btn.st?btn.c:`${T.txM}60`,
+                                              fontFamily:ff,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",
+                                            }}>{btn.icon}</button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : null}
+                                {dateEdits[cellKey] && !isEditingDays && <span style={{position:"absolute",top:0,left:1,fontSize:6,color:T.pu}}>✎</span>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Legend */}
+              <div style={{display:"flex",gap:14,marginTop:8,flexWrap:"wrap"}}>
+                {[
+                  [T.gn,"✓","Actividades concluídas"],
+                  [T.or,"⚡","Manutenção corretiva"],
+                  [T.pu,"◆","Manutenção preditiva"],
+                  [T.rd,"✕","Cancelada"],
+                  [T.yl,"","Mês actual"],
+                  [T.pu,"✎","Data alterada manualmente"],
+                ].map(([c,icon,l])=><span key={l} style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:4}}>
+                  <span style={{width:8,height:8,borderRadius:2,background:`${c}40`,border:`1px solid ${c}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:6,color:c,fontWeight:700}}>{icon}</span>{l}
+                </span>)}
+              </div>
+            </div>
+          );
+        })}
+        <div style={{background:"#f0f1f3",borderRadius:6,padding:12,fontSize:13,color:T.txM,lineHeight:1.7,marginTop:4}}>
+          <b>(1)</b> Sempre que possível, as rotinas de manutenção serão agendadas na 3ª semana de cada mês, salvo excepção do ano novo chinês (2026) e outros feriados.<br/>
+          <b>(2)</b> As unidades de tratamento de ar existentes (UTA) estão não operacionais e consideradas para substituição no futuro plano de remodelação das infraestruturas do Consulado.<br/>
+          <span style={{color:T.gn}}>■</span> Actividades concluídas &nbsp;&nbsp; <span style={{color:T.or}}>■</span> Actividades de manutenção corretiva
+        </div>
+      </div>}
+
+      {/* ═══ ATIVOS MONITORADOS ═══ */}
+      {tab==="ativos"&&<div data-tab="ativos">
+        <div style={{fontSize:13,fontWeight:800,color:T.txB,textTransform:"uppercase",letterSpacing:1,marginBottom:14}}>Ativos sob Monitorização Corretiva</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+          {CORRETIVA_MONITORED.map((a,i) => {
+            const sys = SYSTEMS.find(s=>s.id===a.system);
+            const daysSince = daysBetween(a.since, TODAY);
+            const hasEvent = !!a.lastEvent;
+            return (
+              <div key={i} style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,border:`1px solid ${hasEvent?`${T.or}50`:T.brd}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:800,color:T.txB}}>{a.system}</div>
+                    <div style={{fontSize:13,color:T.txM}}>{sys?.name}</div>
+                  </div>
+                  <Badge color={hasEvent?T.or:T.gn} bg={hasEvent?`${T.or}18`:`${T.gn}18`}>{hasEvent?"Com ocorrência":"Monitorado"}</Badge>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Desde</div><div style={{fontSize:13,fontWeight:700,color:T.tx}}>{fmtDate(a.since)}</div></div>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Dias em monit.</div><div style={{fontSize:13,fontWeight:700,color:T.ac}}>{daysSince}</div></div>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Última ocorrência</div><div style={{fontSize:13,fontWeight:700,color:hasEvent?T.or:T.txM}}>{a.lastEvent?fmtDate(a.lastEvent):"Nenhuma"}</div></div>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Estado</div><Dot color={hasEvent?T.or:T.gn} label={hasEvent?"Activo":"Estável"}/></div>
+                </div>
+                {a.notes&&<div style={{marginTop:8,fontSize:13,color:T.txM,padding:"6px 8px",background:"#f8f9fa",borderRadius:4,borderLeft:`2px solid ${T.or}`}}>{a.notes}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>}
+
+      {/* ═══ ANÁLISE ═══ */}
+      {tab==="analise"&&<div data-tab="analise">
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14}}>
+          {/* Volume por Tipo */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Volume por Tipo</div>
+            <Donut data={[{v:stats.prev,c:T.bl},{v:stats.corr,c:T.rd},{v:stats.pred,c:T.pu}]}/>
+            <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:10}}>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.bl}}/>Preventiva ({stats.prev})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.rd}}/>Corretiva ({stats.corr})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.pu}}/>Preditiva ({stats.pred})</span>
+            </div>
+          </div>
+          {/* Estado de Manutenção */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Estado de Manutenção</div>
+            <Donut data={[{v:stats.done,c:T.gn},{v:stats.sched,c:T.yl},{v:stats.cancel,c:T.rd}]}/>
+            <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:10}}>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.gn}}/>Realizada ({stats.done})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.yl}}/>Agendada ({stats.sched})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.rd}}/>Cancelada ({stats.cancel})</span>
+            </div>
+          </div>
+          {/* Conclusão após Manutenção */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Conclusão após Manutenção</div>
+            {(()=>{
+              const agendar=wo.filter(w=>w.conclusion?.includes("Agendar")).length;
+              const apto=wo.filter(w=>w.conclusion?.includes("Apto")||w.disposition?.includes("Apto")).length;
+              const descarte=wo.filter(w=>w.disposition?.includes("descarte")).length;
+              const subst=wo.filter(w=>w.conclusion?.includes("Substituição")).length;
+              return <>
+                <Donut data={[{v:agendar,c:T.bl},{v:apto,c:T.gn},{v:descarte,c:T.rd},{v:subst,c:T.or}]}/>
+                <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:10}}>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.bl}}/>Agendar ({agendar})</span>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.gn}}/>Apto ({apto})</span>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.rd}}/>Descarte ({descarte})</span>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.or}}/>Subst. peças ({subst})</span>
+                </div>
+              </>;
+            })()}
+          </div>
+          {/* Troca de Peças */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Necessário Troca de Peças</div>
+            <Donut data={[{v:stats.partsNo||wo.filter(w=>w.parts==="Não").length,c:T.bl},{v:stats.partsYes||wo.filter(w=>w.parts==="Sim").length,c:T.or}]}/>
+            <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:10}}>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.bl}}/>Não</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.or}}/>Sim</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Resumo Mensal Table */}
+        <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,marginTop:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:10}}>Resumo e Previsões — 2026</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+              <thead><tr>
+                <th style={{textAlign:"left",padding:"5px 8px",color:T.txM,fontSize:13,borderBottom:`1px solid ${T.brd}`}}>Tipo</th>
+                {MONTH_KEYS.map(m=><th key={m} style={{textAlign:"center",padding:"5px 4px",color:T.txM,fontSize:13,borderBottom:`1px solid ${T.brd}`}}>{m}</th>)}
+                <th style={{textAlign:"center",padding:"5px 6px",color:T.txB,fontSize:13,fontWeight:800,borderBottom:`1px solid ${T.brd}`}}>Total</th>
+              </tr></thead>
+              <tbody>
+                {[["Total de Actividades","total",T.txB],["Preventiva","prev",T.bl],["Corretiva","corr",T.rd],["Preditiva","pred",T.pu]].map(([label,key,color])=>(
+                  <tr key={key}>
+                    <td style={{padding:"5px 8px",fontWeight:600,color,borderBottom:`1px solid ${T.brd}`}}>{label}</td>
+                    {monthStats.map((m,i)=><td key={i} style={{textAlign:"center",padding:"5px 4px",color:m[key]>0?color:T.txM,fontWeight:m[key]>0?700:400,borderBottom:`1px solid ${T.brd}`}}>{m[key]}</td>)}
+                    <td style={{textAlign:"center",padding:"5px 6px",fontWeight:800,color,borderBottom:`1px solid ${T.brd}`}}>{monthStats.reduce((s,m)=>s+m[key],0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>}
+
+      </div>
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
