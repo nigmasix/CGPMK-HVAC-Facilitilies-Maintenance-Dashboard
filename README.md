@@ -1,1 +1,1 @@
-Dashboard/folha da gestao de manutencao do sistem AVAC do Consulado de Macau e HongKong.
+Dashboard/folha da gestão de manutenção do sistema AVAC do Consulado de Macau e Hong Kong.
