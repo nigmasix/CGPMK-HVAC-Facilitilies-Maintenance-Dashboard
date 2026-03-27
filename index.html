@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CGPMHK — Gestão de Manutenção 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Calibri', 'Helvetica Neue', system-ui, sans-serif; }
+  @media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; background: #fff !important; }
+    [data-no-print] { display: none !important; }
+    /* Hide all tabs by default when printing */
+    [data-tab] { display: none !important; }
+    /* Show only the active tab (single tab print) */
+    body[data-print-scope="painel"] [data-tab="painel"] { display: block !important; }
+    body[data-print-scope="os"] [data-tab="os"] { display: block !important; }
+    body[data-print-scope="plano"] [data-tab="plano"] { display: block !important; }
+    body[data-print-scope="ativos"] [data-tab="ativos"] { display: block !important; }
+    body[data-print-scope="analise"] [data-tab="analise"] { display: block !important; }
+    /* Show all tabs for full print */
+    body[data-print-scope="all"] [data-tab] { display: block !important; page-break-after: always; }
+    table { font-size: 9px !important; }
+  }
+</style>
+<datalist id="disp-options">
+  <option value="Apto para serviço"/>
+  <option value="Substituição de peças"/>
+  <option value="Direcionar para descarte"/>
+  <option value="Agendar próxima preventiva"/>
+  <option value="Agendar próxima corretiva"/>
+  <option value="Em análise"/>
+  <option value="Aguarda peças"/>
+  <option value="Resolvido"/>
+</datalist>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+
+/* ═══ LOGOS (ficheiros externos) ═══ */
+const LOGO_EEM = "logo_eem.png";
+const LOGO_CGPMHK = "logo_cgpmhk.png";
+
+/* ═══════════════════════════════════════════
+   DATA — PAM 2026 CGPMHK
+   ═══════════════════════════════════════════ */
+
+const SYSTEMS = [
+  { id: "CHIL", name: "Chillers Arrefecidos a Água", nameZh: "水冷式冷水機", group: "AVAC" },
+  { id: "BOMB", name: "Bombas de Água", nameZh: "水泵", group: "AVAC" },
+  { id: "TORR", name: "Torres de Arrefecimento", nameZh: "冷卻塔", group: "AVAC" },
+  { id: "SPLI", name: "Unidades de Expansão Directa (SPLIT)", nameZh: "直膨式單位", group: "AVAC" },
+  { id: "VC", name: "Ventiloconvectores (VC)", nameZh: "風機盤管", group: "AVAC" },
+  { id: "UTA", name: "Unidades de Tratamento de Ar (UTA)", nameZh: "空氣處理單位", group: "AVAC", inactive: true },
+];
+
+// Monthly plan - day numbers per month for each system
+const PAM_MENSAL = {
+  CHIL: { Jan: [22], Fev: [25,26,27], Mar: [20], Abr: [16], Mai: [14], Jun: [18], Jul: [16], Ago: [13], Set: [17], Out: [15], Nov: [19], Dez: [17] },
+  BOMB: { Jan: [22,23], Fev: [], Mar: [20], Abr: [16,17], Mai: [14,15], Jun: [18,19], Jul: [16,17], Ago: [13,14], Set: [17,18], Out: [15,16], Nov: [19,20], Dez: [17,18] },
+  TORR: { Jan: [23], Fev: [25,26,27], Mar: [20], Abr: [17], Mai: [15], Jun: [19], Jul: [17], Ago: [14], Set: [18], Out: [16], Nov: [20], Dez: [18] },
+  SPLI: { Jan: [19], Fev: [], Mar: [19], Abr: [13], Mai: [11], Jun: [15], Jul: [13], Ago: [10], Set: [14], Out: [12], Nov: [16], Dez: [14] },
+  VC:   { Jan: [20,31], Fev: [], Mar: [19], Abr: [14], Mai: [12], Jun: [16], Jul: [14], Ago: [11], Set: [15], Out: [13], Nov: [17], Dez: [15] },
+  UTA:  { Jan: [], Fev: [], Mar: [], Abr: [], Mai: [], Jun: [], Jul: [], Ago: [], Set: [], Out: [], Nov: [], Dez: [] },
+};
+
+const PAM_TRIMESTRAL = {
+  BOMB: { T1: { Mar: [20] }, T2: { Mai: [14,15] }, T3: { Ago: [13,14] }, T4: { Nov: [19,20] } },
+  SPLI: { T1: { Mar: [19] }, T2: { Jun: [15] }, T3: { Set: [14] }, T4: { Dez: [14] } },
+  VC:   { T1: { Mar: [19] }, T2: { Jun: [16] }, T3: { Set: [15] }, T4: { Dez: [15] } },
+  UTA:  { T1: {}, T2: {}, T3: {}, T4: {} },
+};
+
+const PAM_SEMESTRAL = {
+  CHIL: { S1: { Abr: [16] }, S2: { Out: [15] } },
+  BOMB: { S1: { Abr: [16,17] }, S2: { Out: [15,16] } },
+  TORR: { S1: { Abr: [17] }, S2: { Out: [16] } },
+  SPLI: { S1: { Abr: [13] }, S2: { Out: [12] } },
+  VC:   { S1: { Abr: [14] }, S2: { Out: [13] } },
+  UTA:  { S1: {}, S2: {} },
+};
+
+const MONTH_KEYS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const MONTH_FULL = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const MONTH_NUM = { Jan:"01",Fev:"02",Mar:"03",Abr:"04",Mai:"05",Jun:"06",Jul:"07",Ago:"08",Set:"09",Out:"10",Nov:"11",Dez:"12" };
+
+const TODAY = "2026-03-27";
+
+const WORK_ORDERS_INIT = [
+  { id:1, os:"260001", date:"2026-01-20", item:"SPLI", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Substituição de peças", notes:"Daikin 2HP cassette AC — dano no painel (Sala de Servidor GF).", disposition:"Apto para serviço", hasIssue:true },
+  { id:2, os:"260001", date:"2026-01-20", item:"VC", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"", disposition:"Agendar próxima corretiva", hasIssue:false },
+  { id:3, os:"260001", date:"2026-01-31", item:"VC", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"", disposition:"Agendar próxima preventiva", hasIssue:false },
+  { id:4, os:"260002", date:"2026-01-22", item:"TORR", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Substituição de peças", notes:"Motor do ventilador da torre solto (Item B-82). Mantas de absorção sonora envelhecidas e sem efeito.", disposition:"Substituição de peças", hasIssue:true },
+  { id:5, os:"260003", date:"2026-01-22", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"Bomba de água de arrefecimento com fissuras no ponto de amortecimento de vibração (Três).", disposition:"Direcionar para descarte", hasIssue:true },
+  { id:6, os:"260004", date:"2026-01-22", item:"CHIL", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"CHIL2, Cave, Nº CP2, CP3 — Compressor danificado.", disposition:"", hasIssue:true },
+  { id:7, os:"260005", date:"2026-01-22", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"Não", conclusion:"Agendar próxima preventiva", notes:"", disposition:"", hasIssue:false },
+  { id:8, os:"260006", date:"2026-02-26", item:"SPLI", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:9, os:"260006", date:"2026-02-27", item:"VC", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:10, os:"260007", date:"2026-02-28", item:"TORR", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:11, os:"260008", date:"2026-02-28", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:12, os:"260009", date:"2026-02-28", item:"CHIL", freq:"Mensal", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:13, os:"260010", date:"2026-02-28", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Cancelada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:14, os:"260011", date:"2026-02-25", item:"TORR", freq:"—", type:"Corretiva", status:"Realizada", parts:"", conclusion:"", notes:"Incidente de 25/02: Disparo da válvula de segurança do chiller 30HK225A900E devido a inoperacionalidade das torres.", disposition:"", hasIssue:true },
+  { id:15, os:"260012", date:"2026-03-19", item:"SPLI", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:16, os:"260013", date:"2026-03-19", item:"VC", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:17, os:"260014", date:"2026-03-20", item:"CHIL", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:18, os:"260015", date:"2026-03-20", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:19, os:"260016", date:"2026-03-20", item:"BOMB", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:20, os:"260017", date:"2026-03-20", item:"TORR", freq:"Mensal", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:21, os:"260015", date:"2026-03-20", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:22, os:"260016", date:"2026-03-20", item:"BOMB", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:23, os:"260012", date:"2026-03-19", item:"SPLI", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+  { id:24, os:"260013", date:"2026-03-19", item:"VC", freq:"Trimestral", type:"Preventiva", status:"Realizada", parts:"", conclusion:"", notes:"", disposition:"", hasIssue:false },
+];
+
+const CORRETIVA_MONITORED = [
+  { system: "CHIL", since: "2026-01-22", lastEvent: null, notes: "CHIL2 CP2/CP3 compressor danificado" },
+  { system: "BOMB", since: "2026-01-22", lastEvent: null, notes: "Fissuras no amortecimento de vibração" },
+  { system: "TORR", since: "2026-01-22", lastEvent: "2026-02-25", notes: "Incidente válvula segurança chiller" },
+  { system: "SPLI", since: "2026-01-20", lastEvent: "2026-02-28", notes: "Dano painel AC Daikin" },
+  { system: "VC", since: "2026-01-20", lastEvent: null, notes: "" },
+];
+
+/* ═══ HELPERS ═══ */
+function fmtDate(d) { if(!d) return "—"; const p=d.split("-"); return `${p[2]}/${p[1]}/${p[0]}`; }
+function daysBetween(a,b) { return Math.ceil((new Date(b)-new Date(a))/86400000); }
+function isPast(d) { return d < TODAY; }
+function isThisMonth(d) { return d.substring(0,7) === TODAY.substring(0,7); }
+
+/* ═══ THEME — Excel-faithful light theme ═══ */
+const T = {
+  bg:"#ffffff", s1:"#f8f9fa", s2:"#f0f1f3", s3:"#e8eaed", brd:"#d0d5dd",
+  tx:"#1a1a1a", txM:"#6b7280", txB:"#111111",
+  ac:"#2563eb", acL:"#1d4ed8",
+  gn:"#92D050", gnDk:"#548235",   // Excel green for completed
+  yl:"#FFC000", ylDk:"#BF9000",   // Excel gold/amber
+  or:"#ED7D31", orDk:"#C55A11",   // Excel orange for corrective
+  rd:"#FF0000", rdDk:"#C00000",   // Excel red for cancelled
+  bl:"#4472C4", blDk:"#2F5597",   // Excel blue
+  pu:"#7030A0", cy:"#00B0F0",
+  hdrGn:"#375623",                // Dark green header bar
+  hdrGrey:"#A6A6A6",              // Grey header row
+};
+const ff = "'Segoe UI', 'Calibri', 'Helvetica Neue', system-ui, sans-serif";
+
+/* ═══ COMPONENTS ═══ */
+const Badge = ({children, color, bg}) => (
+  <span style={{padding:"2px 8px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:0.5,color,background:bg,textTransform:"uppercase",whiteSpace:"nowrap"}}>{children}</span>
+);
+const Dot = ({color, label}) => (
+  <span style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:13,fontWeight:600,color}}>
+    <span style={{width:7,height:7,borderRadius:"50%",background:color,boxShadow:`0 0 6px ${color}50`}}/>{label}
+  </span>
+);
+
+function App() {
+  const [tab, setTab] = useState("painel");
+  const [wo, setWo] = useState(WORK_ORDERS_INIT);
+  const [fStatus, setFS] = useState("all");
+  const [fType, setFT] = useState("all");
+  const [fEquip, setFE] = useState("all");
+  const [fMonth, setFM] = useState("all");
+  const [expanded, setExpanded] = useState(null);
+  const [dateEdits, setDateEdits] = useState({});
+  const [editing, setEditing] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingWo, setEditingWo] = useState(null);
+  const [cellStatuses, setCellStatuses] = useState(() => {
+    // Pre-populate completed cells from work order data
+    const init = {};
+    const completedCombos = {};
+    WORK_ORDERS_INIT.forEach(w => {
+      if(w.status==="Realizada") {
+        const mi = parseInt(w.date.split("-")[1])-1;
+        const mk = MONTH_KEYS[mi];
+        const freq = w.freq === "—" ? null : w.freq;
+        if(freq) init[`${w.item}_${freq}_${mk}`] = "completed";
+        if(w.type==="Corretiva" && freq) init[`${w.item}_${freq||"Mensal"}_${mk}`] = "corrective";
+      }
+      if(w.status==="Cancelada") {
+        const mi = parseInt(w.date.split("-")[1])-1;
+        const mk = MONTH_KEYS[mi];
+        const freq = w.freq === "—" ? "Mensal" : w.freq;
+        init[`${w.item}_${freq}_${mk}`] = "cancelled";
+      }
+    });
+    return init;
+  });
+
+  const setCellStatus = useCallback((cellKey, status) => {
+    setCellStatuses(prev => ({...prev, [cellKey]: status}));
+    touchLastUpdate();
+  },[touchLastUpdate]);
+  const [newWo, setNewWo] = useState({os:"",date:"",item:"CHIL",type:"Preventiva",freq:"Mensal",status:"Agendada",notes:""});
+  const [lastUpdate, setLastUpdate] = useState(TODAY);
+  const [monitoredAssets, setMonitoredAssets] = useState(CORRETIVA_MONITORED);
+  const [editingNote, setEditingNote] = useState(null);
+  const [showAddAsset, setShowAddAsset] = useState(false);
+  const [newAsset, setNewAsset] = useState({system:"",since:TODAY,notes:""});
+  const [editingLastUpdate, setEditingLastUpdate] = useState(false);
+  const touchLastUpdate = useCallback(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,"0");
+    const d = String(now.getDate()).padStart(2,"0");
+    setLastUpdate(`${y}-${m}-${d}`);
+  }, []);
+  const updateAssetNote = useCallback((system, note) => {
+    setMonitoredAssets(prev => prev.map(a => a.system===system ? {...a, notes:note} : a));
+    touchLastUpdate();
+  }, [touchLastUpdate]);
+  const addAsset = useCallback(() => {
+    if(!newAsset.system.trim()) return;
+    setMonitoredAssets(prev => [...prev, {system:newAsset.system.trim().toUpperCase(), since:newAsset.since||TODAY, lastEvent:null, notes:newAsset.notes}]);
+    setNewAsset({system:"",since:TODAY,notes:""});
+    setShowAddAsset(false);
+    touchLastUpdate();
+  }, [newAsset, touchLastUpdate]);
+  const removeAsset = useCallback((system) => {
+    setMonitoredAssets(prev => prev.filter(a => a.system!==system));
+    touchLastUpdate();
+  }, [touchLastUpdate]);
+
+  /* Stats */
+  const stats = useMemo(() => {
+    const d=wo.filter(w=>w.status==="Realizada").length, s=wo.filter(w=>w.status==="Agendada").length, can=wo.filter(w=>w.status==="Cancelada").length;
+    const p=wo.filter(w=>w.type==="Preventiva").length, c=wo.filter(w=>w.type==="Corretiva").length, pred=wo.filter(w=>w.type==="Preditiva").length;
+    const iss=wo.filter(w=>w.hasIssue).length;
+    return {total:wo.length,done:d,sched:s,cancel:can,prev:p,corr:c,pred:pred,issues:iss};
+  },[wo]);
+
+  const monthStats = useMemo(() => MONTH_FULL.map((m,i) => {
+    const items = wo.filter(w=>w.date.split("-")[1]===String(i+1).padStart(2,"0"));
+    const active=items.filter(w=>w.status!=="Cancelada"); return {month:m,short:MONTH_KEYS[i],total:active.length,done:items.filter(w=>w.status==="Realizada").length,sched:items.filter(w=>w.status==="Agendada").length,cancel:items.filter(w=>w.status==="Cancelada").length,prev:active.filter(w=>w.type==="Preventiva").length,corr:active.filter(w=>w.type==="Corretiva").length,pred:active.filter(w=>w.type==="Preditiva").length};
+  }),[wo]);
+
+  const filtered = useMemo(() => wo.filter(w => {
+    if(fStatus!=="all"&&w.status!==fStatus) return false;
+    if(fType!=="all"&&w.type!==fType) return false;
+    if(fEquip!=="all"&&w.item!==fEquip) return false;
+    if(fMonth!=="all") { const mi=MONTH_FULL.indexOf(fMonth); if(parseInt(w.date.split("-")[1])!==mi+1) return false; }
+    return true;
+  }),[wo,fStatus,fType,fEquip,fMonth]);
+
+  const issues = useMemo(()=>wo.filter(w=>w.hasIssue&&w.notes),[wo]);
+
+  /* PAM with overrides */
+  const getPamDays = useCallback((sysId, monthKey, freq) => {
+    const key = `${sysId}_${freq}_${monthKey}`;
+    if (dateEdits[key]) return dateEdits[key];
+    if (freq==="Mensal") return PAM_MENSAL[sysId]?.[monthKey] || [];
+    if (freq==="Trimestral") {
+      const q = PAM_TRIMESTRAL[sysId];
+      if(!q) return [];
+      for(const t of ["T1","T2","T3","T4"]) { if(q[t]?.[monthKey]) return q[t][monthKey]; }
+      return [];
+    }
+    if (freq==="Semestral") {
+      const s = PAM_SEMESTRAL[sysId];
+      if(!s) return [];
+      for(const sem of ["S1","S2"]) { if(s[sem]?.[monthKey]) return s[sem][monthKey]; }
+      return [];
+    }
+    return [];
+  },[dateEdits]);
+
+  const saveDateEdit = useCallback((sysId, freq, monthKey, newDays) => {
+    const key = `${sysId}_${freq}_${monthKey}`;
+    setDateEdits(prev => ({...prev, [key]: newDays}));
+    setEditing(null);
+  },[]);
+  const clearCell = useCallback((sysId, freq, monthKey) => {
+    const key = `${sysId}_${freq}_${monthKey}`;
+    setDateEdits(prev => ({...prev, [key]: []}));
+    setCellStatuses(prev => ({...prev, [key]: "pending"}));
+    touchLastUpdate();
+  },[touchLastUpdate]);
+
+  const addOrder = useCallback(() => {
+    if(!newWo.os||!newWo.date) return;
+    setWo(prev => [...prev, {...newWo, id:prev.length+1, parts:"", conclusion:"", disposition:"", hasIssue:newWo.type==="Corretiva"}]);
+    touchLastUpdate();
+    setNewWo({os:"",date:"",item:"CHIL",type:"Preventiva",freq:"Mensal",status:"Agendada",notes:""});
+    setShowAdd(false);
+  },[newWo]);
+
+  const updateField = useCallback((id, field, value) => {
+    setWo(prev => {
+      const updated = prev.map(w => w.id===id ? {...w, [field]: value, hasIssue: field==="type" ? value==="Corretiva" : w.hasIssue} : w);
+      // Sync notes to monitored asset if the field is "notes"
+      if(field==="notes") {
+        const wo = updated.find(w=>w.id===id);
+        if(wo) updateAssetNote(wo.item, value);
+      }
+      return updated;
+    });
+    touchLastUpdate();
+  },[touchLastUpdate, updateAssetNote]);
+
+  const startEditWo = useCallback((w) => {
+    setEditingWo(w.id);
+  },[]);
+
+  const stopEditWo = useCallback(() => {
+    setEditingWo(null);
+  },[]);
+
+  /* Upcoming from PAM */
+  const upcoming = useMemo(() => {
+    const items = [];
+    const todayMonth = parseInt(TODAY.split("-")[1]);
+    const todayDay = parseInt(TODAY.split("-")[2]);
+    SYSTEMS.filter(s=>!s.inactive).forEach(sys => {
+      ["Mensal","Trimestral","Semestral"].forEach(freq => {
+        for(let mi=todayMonth-1; mi<Math.min(todayMonth+1,12); mi++) {
+          const mk = MONTH_KEYS[mi];
+          const days = getPamDays(sys.id, mk, freq);
+          days.forEach(d => {
+            const dateStr = `2026-${String(mi+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+            const diff = daysBetween(TODAY, dateStr);
+            if(diff > 0 && diff <= 45) items.push({system:sys.id,name:sys.name,freq,date:dateStr,daysLeft:diff});
+          });
+        }
+      });
+    });
+    return items.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,10);
+  },[getPamDays]);
+
+  const maxBar = Math.max(...monthStats.map(m=>m.total),1);
+
+  /* Donut */
+  const Donut = ({data, size=90, thick=12}) => {
+    const total = data.reduce((s,d)=>s+d.v,0);
+    if(!total) return null;
+    const r=(size-thick)/2, circ=2*Math.PI*r;
+    let off=0;
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={T.brd} strokeWidth={thick}/>
+        {data.map((d,i) => {
+          const dash=circ*d.v/total, gap=circ-dash;
+          const el = <circle key={i} cx={size/2} cy={size/2} r={r} fill="none" stroke={d.c} strokeWidth={thick} strokeDasharray={`${dash} ${gap}`} strokeDashoffset={-off} transform={`rotate(-90 ${size/2} ${size/2})`}/>;
+          off+=dash; return el;
+        })}
+        <text x={size/2} y={size/2-4} textAnchor="middle" fill={T.txB} fontSize="15" fontWeight="800" fontFamily={ff}>{total}</text>
+        <text x={size/2} y={size/2+10} textAnchor="middle" fill={T.txM} fontSize="8" fontFamily={ff}>total</text>
+      </svg>
+    );
+  };
+
+  const sel = (v,fn,opts) => <select value={v} onChange={e=>fn(e.target.value)} style={{padding:"6px 10px",borderRadius:4,border:`1px solid ${T.brd}`,background:"#fff",color:T.tx,fontSize:13,fontFamily:ff,cursor:"pointer"}}>{opts.map(([val,lab])=><option key={val} value={val}>{lab}</option>)}</select>;
+
+  const tabBtn = (id,label) => <button key={id} onClick={()=>setTab(id)} style={{padding:"9px 16px",cursor:"pointer",fontSize:13,fontWeight:700,letterSpacing:0.6,textTransform:"uppercase",border:"none",background:tab===id?"#fff":T.s2,color:tab===id?T.hdrGn:T.txM,borderBottom:tab===id?`3px solid ${T.hdrGn}`:"3px solid transparent",borderRadius:"5px 5px 0 0",fontFamily:ff,transition:"all 0.15s"}}>{label}</button>;
+
+  const card = (lbl,val,color,sub) => (
+    <div style={{background:"#fff",borderRadius:6,padding:"14px 16px",borderLeft:`4px solid ${color}`,flex:"1 1 120px",minWidth:110,boxShadow:"0 1px 3px rgba(0,0,0,0.08)",border:`1px solid ${T.brd}`}}>
+      <div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700}}>{lbl}</div>
+      <div style={{fontSize:24,fontWeight:800,color}}>{val}</div>
+      {sub&&<div style={{fontSize:13,color:T.txM,marginTop:2}}>{sub}</div>}
+    </div>
+  );
+
+  const inputSt = {padding:"6px 10px",borderRadius:4,border:`1px solid ${T.brd}`,background:"#fff",color:T.tx,fontSize:13,fontFamily:ff,width:"100%",boxSizing:"border-box"};
+
+  /* Check if a month/system combo is completed based on work orders */
+  const handlePrint = useCallback((scope) => {
+    // Set a data attribute so CSS knows which tab to show
+    document.body.setAttribute('data-print-scope', scope);
+    window.print();
+    setTimeout(() => { document.body.removeAttribute('data-print-scope'); }, 1000);
+  },[]);
+
+  return (
+    <div style={{fontFamily:ff,background:"#f5f5f5",color:T.tx,minHeight:"100vh",padding:"0",lineHeight:1.4}}>
+      {/* Header — faithful to Excel */}
+      <div style={{marginBottom:0,background:"#fff",padding:"12px 20px 0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          {/* Left — EEM Logo */}
+          <div style={{display:"flex",alignItems:"center",gap:12,minWidth:260}}>
+            <img src={LOGO_EEM} alt="Empresa Eléctrica, Lda." style={{height:48,objectFit:"contain"}} />
+            <div style={{fontSize:13,color:"#555",lineHeight:1.6,fontFamily:"Arial, sans-serif"}}>
+              Avenida Comercial de Macau,<br/>nºs 251A-301, Macau REAM<br/>
+              Telefone: (+853) 2878 3996/8<br/>Fax: (+853) 2832 1330
+            </div>
+          </div>
+          {/* Center — Title */}
+          <div style={{textAlign:"center",flex:1,padding:"0 20px"}}>
+            <h1 style={{margin:0,fontSize:24,fontWeight:800,color:"#111",fontFamily:"Georgia, 'Times New Roman', serif"}}>Consulado Geral de Portugal em Macau e Hong Kong</h1>
+            <p style={{margin:"4px 0 0",fontSize:16,color:"#333",fontFamily:"SimSun, STSong, serif"}}>葡萄牙駐澳門及香港總領事館</p>
+          </div>
+          {/* Right — CGPMHK Logo */}
+          <div style={{minWidth:180,display:"flex",justifyContent:"flex-end"}}>
+            <img src={LOGO_CGPMHK} alt="Consulado Geral de Portugal em Macau e Hong Kong" style={{height:48,objectFit:"contain"}} />
+          </div>
+        </div>
+        {/* Sub-header bar — GREY */}
+        <div style={{background:"#808080",color:"#fff",padding:"7px 14px",marginTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:13,fontWeight:700,letterSpacing:0.5}}>PLANO GERAL DE MANUTENÇÃO ANUAL 年度一般維護計劃</span>
+          <span style={{fontSize:10,display:"flex",alignItems:"center",gap:4}}>
+            Última actualização: &nbsp;
+            {editingLastUpdate
+              ? <input type="date" autoFocus value={lastUpdate}
+                  onChange={e=>setLastUpdate(e.target.value)}
+                  onBlur={()=>setEditingLastUpdate(false)}
+                  onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape")setEditingLastUpdate(false);}}
+                  style={{fontSize:10,padding:"1px 4px",border:"1px solid #fff8",borderRadius:3,background:"rgba(255,255,255,0.15)",color:"#fff",outline:"none",width:110}}/>
+              : <span onClick={()=>setEditingLastUpdate(true)} style={{cursor:"pointer",textDecoration:"underline dotted",opacity:0.9}} title="Clique para editar">{fmtDate(lastUpdate)}</span>
+            }
+          </span>
+        </div>
+      </div>
+
+      {/* Tabs + Print buttons */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#fff",padding:"0 16px",borderBottom:`1px solid ${T.brd}`}} data-no-print>
+        <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>{[["painel","Painel Geral"],["os","Ordens de Serviço"],["plano","Plano Anual"],["ativos","Ativos Monitorados"],["analise","Análise"]].map(([id,l])=>tabBtn(id,l))}</div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button onClick={()=>handlePrint(tab)} style={{padding:"6px 12px",border:`1px solid ${T.brd}`,borderRadius:4,background:"#fff",color:"#333",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ff,display:"flex",alignItems:"center",gap:4}}>
+            🖨 Imprimir tab actual
+          </button>
+          <button onClick={()=>handlePrint("all")} style={{padding:"6px 12px",border:`1px solid ${T.hdrGn}`,borderRadius:4,background:T.hdrGn,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ff,display:"flex",alignItems:"center",gap:4}}>
+            🖨 Imprimir tudo (A4)
+          </button>
+        </div>
+      </div>
+      <div style={{padding:"16px 16px"}}>
+
+      {/* ═══ PAINEL GERAL ═══ */}
+      {tab==="painel"&&<div data-tab="painel">
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
+          {card("Total OS",stats.total,T.ac)}
+          {card("Realizadas",stats.done,T.gn)}
+          {card("Agendadas",stats.sched,T.yl)}
+          {card("Canceladas",stats.cancel,T.rd)}
+          {card("Preventivas",stats.prev,T.bl)}
+          {card("Corretivas",stats.corr,T.or)}
+          {card("Preditivas",stats.pred,T.pu)}
+          {card("Alertas",stats.issues,T.or)}
+        </div>
+
+        <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:1,marginBottom:14}}>Manutenções por Mês — 2026</div>
+          <div style={{display:"flex",gap:4,alignItems:"flex-end",height:110}}>
+            {monthStats.map((m,i) => (
+              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                <div style={{width:"100%",display:"flex",gap:1,alignItems:"flex-end",height:90}}>
+                  <div style={{flex:1,borderRadius:"2px 2px 0 0",height:`${(m.prev/maxBar)*100}%`,background:T.bl,minHeight:m.prev>0?20:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {m.prev>0&&<span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{m.prev}</span>}
+                  </div>
+                  {m.corr>0&&<div style={{flex:1,borderRadius:"2px 2px 0 0",height:`${(m.corr/maxBar)*100}%`,background:T.or,minHeight:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{m.corr}</span>
+                  </div>}
+                  {m.pred>0&&<div style={{flex:1,borderRadius:"2px 2px 0 0",height:`${(m.pred/maxBar)*100}%`,background:T.pu,minHeight:20,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <span style={{fontSize:13,fontWeight:800,color:"#fff"}}>{m.pred}</span>
+                  </div>}
+                </div>
+                <span style={{fontSize:13,color:T.txM,fontWeight:600}}>{m.short}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:14,marginTop:10,justifyContent:"center"}}>
+            {[[T.bl,"Preventiva"],[T.or,"Corretiva"],[T.pu,"Preditiva"]].map(([c,l])=><span key={l} style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:T.txM}}><span style={{width:7,height:7,borderRadius:2,background:c}}/>{l}</span>)}
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          {/* Upcoming */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.yl,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>⏱ Próximas Manutenções</div>
+            {upcoming.length===0&&<p style={{fontSize:13,color:T.txM}}>Sem manutenções próximas.</p>}
+            {upcoming.map((u,i) => {
+              const uc = u.daysLeft<=7?T.rd:u.daysLeft<=21?T.or:T.yl;
+              return <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<upcoming.length-1?`1px solid ${T.brd}`:"none"}}>
+                <div><span style={{fontSize:13,fontWeight:700,color:T.txB}}>{u.system}</span><span style={{fontSize:13,color:T.txM,marginLeft:6}}>{u.freq}</span></div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:13,fontWeight:700,color:uc,background:`${uc}15`,padding:"2px 7px",borderRadius:3}}>{u.daysLeft}d</span>
+                  <span style={{fontSize:13,color:T.txM,minWidth:80,textAlign:"right"}}>{fmtDate(u.date)}</span>
+                </div>
+              </div>;
+            })}
+          </div>
+          {/* Issues */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.or,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>⚠ Alertas Activos</div>
+            {issues.map((w,i) => (
+              <div key={i} style={{padding:"8px 10px",marginBottom:6,borderRadius:6,background:"#f8f9fa",border:`1px solid ${T.brd}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:13,fontWeight:700,color:T.txB}}>OS#{w.os} — {w.item}</span>
+                  <span style={{fontSize:13,color:T.txM}}>{fmtDate(w.date)}</span>
+                </div>
+                <p style={{margin:0,fontSize:13,color:T.txM,lineHeight:1.5}}>{w.notes}</p>
+                <div style={{marginTop:6,display:"flex",alignItems:"center",gap:4}}>
+                  <span style={{fontSize:13,color:T.txM,flexShrink:0}}>→</span>
+                  <input
+                    list="disp-options"
+                    value={w.disposition||""}
+                    onChange={e=>updateField(w.id,"disposition",e.target.value)}
+                    placeholder="Disposição..."
+                    style={{flex:1,fontSize:13,color:w.disposition?T.gn:T.txM,fontWeight:w.disposition?600:400,border:"none",borderBottom:`1px dashed ${w.disposition?T.gn:T.brd}`,background:"transparent",outline:"none",padding:"2px 0",cursor:"text"}}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>}
+
+      {/* ═══ ORDENS DE SERVIÇO ═══ */}
+      {tab==="os"&&<div data-tab="os">
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
+          {sel(fStatus,setFS,[["all","Todos os estados"],["Realizada","Realizada"],["Agendada","Agendada"],["Cancelada","Cancelada"]])}
+          {sel(fType,setFT,[["all","Todos os tipos"],["Preventiva","Preventiva"],["Corretiva","Corretiva"],["Preditiva","Preditiva"]])}
+          {sel(fEquip,setFE,[["all","Todos os equipamentos"],...SYSTEMS.map(s=>[s.id,s.id])])}
+          {sel(fMonth,setFM,[["all","Todos os meses"],...MONTH_FULL.map(m=>[m,m])])}
+          <span style={{fontSize:13,color:T.txM,marginLeft:4}}>{filtered.length}/{wo.length} registos</span>
+          <button onClick={()=>setShowAdd(!showAdd)} style={{marginLeft:"auto",padding:"6px 12px",borderRadius:5,border:`1px solid ${T.ac}`,background:"transparent",color:T.ac,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff}}>+ Nova OS</button>
+        </div>
+
+        {showAdd&&<div style={{background:"#f0f1f3",borderRadius:8,padding:14,marginBottom:14,display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr auto",gap:8,alignItems:"end"}}>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>OS#</div><input value={newWo.os} onChange={e=>setNewWo(p=>({...p,os:e.target.value}))} style={inputSt} placeholder="260018"/></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Data</div><input type="date" value={newWo.date} onChange={e=>setNewWo(p=>({...p,date:e.target.value}))} style={inputSt}/></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Sistema</div><select value={newWo.item} onChange={e=>setNewWo(p=>({...p,item:e.target.value}))} style={inputSt}>{SYSTEMS.map(s=><option key={s.id} value={s.id}>{s.id}</option>)}</select></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Tipo</div><select value={newWo.type} onChange={e=>setNewWo(p=>({...p,type:e.target.value}))} style={inputSt}><option>Preventiva</option><option>Corretiva</option><option>Preditiva</option></select></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Frequência</div><select value={newWo.freq} onChange={e=>setNewWo(p=>({...p,freq:e.target.value}))} style={inputSt}><option>Mensal</option><option>Trimestral</option><option>Semestral</option><option>—</option></select></div>
+          <div><div style={{fontSize:13,color:T.txM,marginBottom:3}}>Estado</div><select value={newWo.status} onChange={e=>setNewWo(p=>({...p,status:e.target.value}))} style={inputSt}><option>Agendada</option><option>Realizada</option><option>Cancelada</option></select></div>
+          <button onClick={addOrder} style={{padding:"6px 14px",borderRadius:5,border:"none",background:T.gn,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,height:30}}>Guardar</button>
+        </div>}
+
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"separate",borderSpacing:"0 3px",fontSize:11}}>
+            <thead><tr>
+              {["OS#","Data","Sistema","Freq.","Tipo","Estado","Notas",""].map(h=><th key={h} style={{textAlign:"left",padding:"6px 10px",fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,fontWeight:700,borderBottom:`1px solid ${T.brd}`}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{filtered.map((w,i)=>{
+              const isEd = editingWo===w.id;
+              const edSt = {...inputSt,padding:"4px 6px",fontSize:13,width:"auto"};
+              return [
+              <tr key={w.id} style={{background:w.status==="Cancelada"?"#fce8ec":w.hasIssue?"#fff8f0":"#fff",borderBottom:`1px solid ${T.brd}`}}>
+                <td style={{padding:"8px 10px",fontWeight:700,color:T.txB,borderRadius:"6px 0 0 6px",borderLeft:w.status==="Cancelada"?`3px solid #E05470`:w.hasIssue?`3px solid ${T.or}`:"3px solid transparent"}}>
+                  {isEd?<input value={w.os} onChange={e=>updateField(w.id,"os",e.target.value)} style={{...edSt,width:65}}/>:w.os}
+                </td>
+                <td style={{padding:"8px 10px",color:T.txM}}>
+                  {isEd?<input type="date" value={w.date} onChange={e=>updateField(w.id,"date",e.target.value)} style={{...edSt,width:120}}/>:fmtDate(w.date)}
+                </td>
+                <td style={{padding:"8px 10px",fontWeight:600,color:T.tx}}>
+                  {isEd?<select value={w.item} onChange={e=>updateField(w.id,"item",e.target.value)} style={edSt}>{SYSTEMS.map(s=><option key={s.id} value={s.id}>{s.id}</option>)}</select>:w.item}
+                </td>
+                <td style={{padding:"8px 10px"}}>
+                  {isEd?<select value={w.freq} onChange={e=>updateField(w.id,"freq",e.target.value)} style={edSt}><option>Mensal</option><option>Trimestral</option><option>Semestral</option><option>—</option></select>:<Badge color={T.cy} bg={`${T.cy}18`}>{w.freq}</Badge>}
+                </td>
+                <td style={{padding:"8px 10px"}}>
+                  {isEd?<select value={w.type} onChange={e=>updateField(w.id,"type",e.target.value)} style={edSt}><option>Preventiva</option><option>Corretiva</option><option>Preditiva</option></select>:<Badge color={w.type==="Corretiva"?T.or:w.type==="Preditiva"?T.pu:T.bl} bg={w.type==="Corretiva"?`${T.or}18`:w.type==="Preditiva"?`${T.pu}18`:`${T.bl}18`}>{w.type}</Badge>}
+                </td>
+                <td style={{padding:"8px 10px"}}>
+                  {isEd?<select value={w.status} onChange={e=>updateField(w.id,"status",e.target.value)} style={edSt}><option>Agendada</option><option>Realizada</option><option>Cancelada</option></select>:<Dot color={w.status==="Realizada"?T.gn:w.status==="Cancelada"?"#E05470":T.yl} label={w.status}/>}
+                </td>
+                <td style={{padding:"8px 10px",color:T.txM,maxWidth:180,fontSize:10}}>
+                  {isEd?<input value={w.notes} onChange={e=>updateField(w.id,"notes",e.target.value)} style={{...edSt,width:"100%"}} placeholder="Notas..."/>:(w.notes?<span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>{w.notes}</span>:"—")}
+                </td>
+                <td style={{padding:"8px 10px",borderRadius:"0 6px 6px 0",whiteSpace:"nowrap"}}>
+                  <div style={{display:"flex",gap:4}}>
+                    <button onClick={()=>isEd?stopEditWo():startEditWo(w)} style={{background:"transparent",border:`1px solid ${isEd?T.gn:T.ac}`,color:isEd?T.gn:T.ac,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:ff}}>{isEd?"✓ OK":"✎ Editar"}</button>
+                    {!isEd&&w.notes&&<button onClick={()=>setExpanded(expanded===w.id?null:w.id)} style={{background:"transparent",border:`1px solid ${T.brd}`,color:T.txM,padding:"3px 8px",borderRadius:3,cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:ff}}>{expanded===w.id?"−":"+"}</button>}
+                  </div>
+                </td>
+              </tr>,
+              expanded===w.id&&w.notes?<tr key={`n-${w.id}`}><td colSpan={8} style={{padding:"10px 14px",background:"#f8f9fa",borderRadius:6,fontSize:13,color:T.tx,lineHeight:1.6,borderLeft:`3px solid ${T.ac}`}}>
+                <b style={{color:T.ac}}>Notas:</b> {w.notes}
+                {isEd&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+                  <div><span style={{fontSize:13,color:T.txM}}>Conclusão</span><input value={w.conclusion||""} onChange={e=>updateField(w.id,"conclusion",e.target.value)} style={{...inputSt,marginTop:2}}/></div>
+                  <div><span style={{fontSize:13,color:T.txM}}>Disposição</span><input value={w.disposition||""} onChange={e=>updateField(w.id,"disposition",e.target.value)} style={{...inputSt,marginTop:2}}/></div>
+                  <div><span style={{fontSize:13,color:T.txM}}>Peças Substituídas</span><select value={w.parts||""} onChange={e=>updateField(w.id,"parts",e.target.value)} style={{...inputSt,marginTop:2}}><option value="">—</option><option>Não</option><option>Sim</option></select></div>
+                </div>}
+                {!isEd&&w.conclusion&&<><br/><b style={{color:T.yl}}>Conclusão:</b> {w.conclusion}</>}
+                {!isEd&&w.disposition&&<><br/><b style={{color:T.gn}}>Disposição:</b> {w.disposition}</>}
+              </td></tr>:null
+              ];
+            })}
+            </tbody>
+          </table>
+        </div>
+      </div>}
+
+      {/* ═══ PLANO ANUAL ═══ */}
+      {tab==="plano"&&<div data-tab="plano">
+        {[
+          {freq:"Mensal", label:"ACTIVIDADES MENSAIS 每月活動", labelZh:"每月活動",
+           desc:"Medição de parâmetros operacionais, inspeções de segurança, verificações de vazamentos, ruídos, vibrações e isolamento térmico, limpeza básica e registo nas fichas de manutenção.",
+           descZh:"測量操作參數、安全檢查、洩漏驗證、噪音、振動和熱絕緣、基本清潔及記錄日誌",
+           systems: SYSTEMS},
+          {freq:"Trimestral", label:"ACTIVIDADES TRIMESTRAIS 季度活動", labelZh:"季度活動",
+           desc:"Purga e limpeza de strainers, limpeza profunda de filtros e verificação de drenos. Registo nas fichas de manutenção.",
+           descZh:"清洗和清理過濾器，深度清潔濾網，並檢查排水管道。記錄在維護日誌中。",
+           systems: SYSTEMS.filter(s=>["BOMB","SPLI","VC","UTA"].includes(s.id))},
+          {freq:"Semestral", label:"ACTIVIDADES SEMESTRAIS 半年活動", labelZh:"半年活動",
+           desc:"Lubrificação, verificação de fixações, limpeza de coils, inspeção de componentes e registro de observações (além das mensais).",
+           descZh:"潤滑、檢查緊固件、清潔線圈、檢查零件、記錄觀察結果（除每月一次的觀察外）。",
+           systems: SYSTEMS},
+        ].map(section => {
+          const periodHeaders = section.freq==="Trimestral" ? [
+            {label:"TRIMESTRE 1 第一季",span:3,months:["Jan","Fev","Mar"]},
+            {label:"TRIMESTRE 2 第二季",span:3,months:["Abr","Mai","Jun"]},
+            {label:"TRIMESTRE 3 第三季",span:3,months:["Jul","Ago","Set"]},
+            {label:"TRIMESTRE 4 第四季",span:3,months:["Out","Nov","Dez"]},
+          ] : section.freq==="Semestral" ? [
+            {label:"SEMESTRE 1 第一學期",span:6,months:["Jan","Fev","Mar","Abr","Mai","Jun"]},
+            {label:"SEMESTRE 2 第二學期",span:6,months:["Jul","Ago","Set","Out","Nov","Dez"]},
+          ] : null;
+
+          return (
+            <div key={section.freq} style={{marginBottom:24}}>
+              <div style={{fontSize:13,fontWeight:800,color:"#fff",textTransform:"uppercase",letterSpacing:0.8,marginBottom:8,padding:"6px 12px",background:"#808080",borderRadius:2}}>{section.label}</div>
+
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+                  {/* Period header row (Trimestre/Semestre) */}
+                  {periodHeaders && <thead><tr>
+                    <th colSpan={3} style={{background:"#D9D9D9"}}/>
+                    {periodHeaders.map((ph,pi) => <th key={pi} colSpan={ph.span} style={{textAlign:"center",padding:"6px 4px",fontSize:13,fontWeight:700,color:"#333",background:"#D9D9D9",borderLeft:`1px solid #bbb`,letterSpacing:0.5}}>{ph.label}</th>)}
+                  </tr></thead>}
+                  <thead><tr>
+                    <th style={{textAlign:"left",padding:"7px 8px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,minWidth:80,position:"sticky",left:0,background:"#D9D9D9",zIndex:2}}>Grupo<br/><span style={{fontWeight:400,fontSize:8}}>團體</span></th>
+                    <th style={{textAlign:"left",padding:"7px 8px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,minWidth:90,position:"sticky",left:80,background:"#D9D9D9",zIndex:2}}>Sistema<br/><span style={{fontWeight:400,fontSize:8}}>系統</span></th>
+                    <th style={{textAlign:"left",padding:"7px 8px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,minWidth:140,maxWidth:180,position:"sticky",left:170,background:"#D9D9D9",zIndex:2}}>Descrição Geral das<br/>Actividades Principais<br/><span style={{fontWeight:400,fontSize:7}}>主要活動概況</span></th>
+                    {MONTH_KEYS.map(m=><th key={m} style={{textAlign:"center",padding:"7px 4px",color:"#333",fontSize:13,fontWeight:700,borderBottom:`2px solid #999`,background:"#D9D9D9",minWidth:58}}>{m} 26</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {section.systems.map((sys,si) => {
+                      const isFirst = si===0;
+                      const groupRowSpan = isFirst ? section.systems.length : 0;
+
+                      return (
+                        <tr key={`${sys.id}-${section.freq}`}>
+                          {isFirst && <td rowSpan={groupRowSpan} style={{padding:"6px 8px",fontWeight:600,color:T.txM,fontSize:13,lineHeight:1.4,borderBottom:`1px solid ${T.brd}`,verticalAlign:"top",position:"sticky",left:0,background:"#fff",zIndex:1,borderRight:`1px solid ${T.brd}`}}>
+                            Instalações de Aquecimento Ventilação e Ar Condicionado (AVAC)<br/><span style={{fontSize:13,color:T.txM}}>暖氣、通風和空調（HVAC）安裝</span>
+                          </td>}
+                          <td style={{padding:"6px 8px",fontWeight:700,color:T.txB,fontSize:13,borderBottom:`1px solid ${T.brd}`,position:"sticky",left:80,background:"#fff",zIndex:1,borderRight:`1px solid ${T.brd}`}}>
+                            {sys.name}<br/><span style={{fontSize:13,color:T.txM,fontWeight:400}}>{sys.nameZh}</span>
+                          </td>
+                          {isFirst && <td rowSpan={groupRowSpan} style={{padding:"6px 8px",fontSize:13,color:T.txM,lineHeight:1.5,borderBottom:`1px solid ${T.brd}`,verticalAlign:"top",position:"sticky",left:170,background:"#fff",zIndex:1,borderRight:`1px solid ${T.brd}`,maxWidth:180}}>
+                            <div style={{textAlign:"center"}}>{section.desc}</div><div style={{textAlign:"center",color:`${T.txM}90`}}>{section.descZh}</div>
+                          </td>}
+                          {MONTH_KEYS.map(mk => {
+                            if(sys.inactive) return <td key={mk} style={{textAlign:"center",padding:"4px",color:T.txM,fontSize:13,background:"#fff",borderBottom:`1px solid ${T.brd}`,borderLeft:`1px solid ${T.brd}`}}>(2)</td>;
+
+                            const days = getPamDays(sys.id, mk, section.freq);
+                            const cellKey = `${sys.id}_${section.freq}_${mk}`;
+                            const cellStatus = cellStatuses[cellKey] || "pending";
+                            const isEditingDays = editing === cellKey;
+                            const isCurrent = mk === MONTH_KEYS[parseInt(TODAY.split("-")[1])-1];
+
+                            const hasScheduledDays = days.length > 0;
+                            const bgMap = {
+                              completed: "#92D050",
+                              corrective: "#ED7D31",
+                              predictive: "#7030A0",
+                              cancelled: "#FFE0B2",
+                              pending: "#fff",
+                            };
+                            const colorMap = {
+                              completed: "#1a1a1a",
+                              corrective: "#fff",
+                              predictive: "#fff",
+                              cancelled: "#C00000",
+                              pending: "#1a1a1a",
+                            };
+                            // Empty cells (no scheduled days) are always white
+                            const cellBg = hasScheduledDays ? bgMap[cellStatus] : "#fff";
+
+                            return (
+                              <td key={mk} style={{textAlign:"center",padding:"3px 2px",background:cellBg,borderBottom:`1px solid ${T.brd}`,borderLeft:`1px solid ${T.brd}`,position:"relative",minHeight:28,verticalAlign:"middle"}}>
+                                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                                  {days.length > 0 && (isEditingDays ? (
+                                    <input autoFocus defaultValue={days.join(",")}
+                                      onBlur={e=>{const v=e.target.value.split(",").map(Number).filter(n=>n>0&&n<32);saveDateEdit(sys.id,section.freq,mk,v);}}
+                                      onKeyDown={e=>{if(e.key==="Enter"){const v=e.target.value.split(",").map(Number).filter(n=>n>0&&n<32);saveDateEdit(sys.id,section.freq,mk,v);}if(e.key==="Escape")setEditing(null);}}
+                                      style={{width:42,padding:"2px 3px",border:`1px solid ${T.ac}`,borderRadius:3,background:"#f8f9fa",color:T.txB,fontSize:13,textAlign:"center",fontFamily:ff}}
+                                    />
+                                  ) : (
+                                    <span onClick={()=>setEditing(cellKey)} style={{fontWeight:700,color:colorMap[cellStatus],fontSize:13,cursor:"pointer"}}
+                                      title="Clique para editar dias">{days.join(", ")}</span>
+                                  ))}
+                                  {!isEditingDays && (
+                                    <div style={{display:"flex",gap:1}}>
+                                      {[
+                                        {st:"completed",icon:"✓",c:T.gn,tip:"Concluída"},
+                                        {st:"corrective",icon:"⚡",c:T.or,tip:"Corretiva"},
+                                        {st:"predictive",icon:"◆",c:T.pu,tip:"Preditiva"},
+                                        {st:"cancelled",icon:"✕",c:T.rd,tip:"Cancelada"},
+                                        {st:"pending",icon:"○",c:T.txM,tip:"Pendente"},
+                                      ].map(btn => (
+                                        <button key={btn.st} onClick={(e)=>{e.stopPropagation();setCellStatus(cellKey,cellStatus===btn.st?"pending":btn.st);}}
+                                          title={btn.tip}
+                                          style={{
+                                            width:16,height:14,padding:0,border:"none",borderRadius:2,cursor:"pointer",fontSize:13,fontWeight:700,
+                                            background:cellStatus===btn.st?`${btn.c}40`:"transparent",
+                                            color:cellStatus===btn.st?btn.c:`${T.txM}60`,
+                                            fontFamily:ff,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",
+                                          }}>{btn.icon}</button>
+                                      ))}
+                                      <button onClick={(e)=>{e.stopPropagation();clearCell(sys.id,section.freq,mk);}}
+                                        title="Limpar célula (branco)"
+                                        style={{width:16,height:14,padding:0,border:"none",borderRadius:2,cursor:"pointer",fontSize:9,fontWeight:700,background:"transparent",color:`${T.rd}80`,fontFamily:ff,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
+                                    </div>
+                                  )}
+                                </div>
+                                {dateEdits[cellKey] && !isEditingDays && <span style={{position:"absolute",top:0,left:1,fontSize:6,color:T.pu}}>✎</span>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Legend */}
+              <div style={{display:"flex",gap:14,marginTop:8,flexWrap:"wrap"}}>
+                {[
+                  [T.gn,"✓","Actividades concluídas"],
+                  [T.or,"⚡","Manutenção corretiva"],
+                  [T.pu,"◆","Manutenção preditiva"],
+                  [T.rd,"✕","Cancelada"],
+                  [T.yl,"","Mês actual"],
+                ].map(([c,icon,l])=><span key={l} style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:4}}>
+                  <span style={{width:8,height:8,borderRadius:2,background:`${c}40`,border:`1px solid ${c}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:6,color:c,fontWeight:700}}>{icon}</span>{l}
+                </span>)}
+              </div>
+            </div>
+          );
+        })}
+        <div style={{background:"#f0f1f3",borderRadius:6,padding:12,fontSize:13,color:T.txM,lineHeight:1.7,marginTop:4}}>
+          <b>(1)</b> Sempre que possível, as rotinas de manutenção serão agendadas na 3ª semana de cada mês, salvo excepção do ano novo chinês (2026) e outros feriados.<br/>
+          <b>(2)</b> As unidades de tratamento de ar existentes (UTA) estão não operacionais e consideradas para substituição no futuro plano de remodelação das infraestruturas do Consulado.<br/>
+          <span style={{color:T.gn}}>■</span> Actividades concluídas &nbsp;&nbsp; <span style={{color:T.or}}>■</span> Actividades de manutenção corretiva
+        </div>
+      </div>}
+
+      {/* ═══ ATIVOS MONITORADOS ═══ */}
+      {tab==="ativos"&&<div data-tab="ativos">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:800,color:T.txB,textTransform:"uppercase",letterSpacing:1}}>Ativos sob Monitorização Corretiva</div>
+          <button onClick={()=>setShowAddAsset(v=>!v)} data-no-print
+            style={{padding:"5px 12px",borderRadius:4,border:`1px solid ${T.gn}`,background:showAddAsset?"#f0f0f0":T.gn,color:showAddAsset?"#333":"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff}}>
+            {showAddAsset?"✕ Cancelar":"+ Novo Equipamento"}
+          </button>
+        </div>
+        {showAddAsset&&<div data-no-print style={{background:"#fff",borderRadius:6,border:`1px solid ${T.brd}`,padding:14,marginBottom:14,display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
+          <div style={{flex:"1 1 120px"}}>
+            <div style={{fontSize:13,color:T.txM,marginBottom:3}}>Código / ID</div>
+            <input value={newAsset.system} onChange={e=>setNewAsset(p=>({...p,system:e.target.value}))}
+              placeholder="ex: UTA, BOMB2..." list="system-options"
+              style={{...inputSt,width:"100%"}}/>
+            <datalist id="system-options">
+              {SYSTEMS.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </datalist>
+          </div>
+          <div style={{flex:"1 1 120px"}}>
+            <div style={{fontSize:13,color:T.txM,marginBottom:3}}>Data de início</div>
+            <input type="date" value={newAsset.since} onChange={e=>setNewAsset(p=>({...p,since:e.target.value}))} style={{...inputSt,width:"100%"}}/>
+          </div>
+          <div style={{flex:"2 1 200px"}}>
+            <div style={{fontSize:13,color:T.txM,marginBottom:3}}>Observação inicial</div>
+            <input value={newAsset.notes} onChange={e=>setNewAsset(p=>({...p,notes:e.target.value}))}
+              placeholder="Opcional..." style={{...inputSt,width:"100%"}}/>
+          </div>
+          <button onClick={addAsset}
+            style={{padding:"7px 16px",borderRadius:4,border:"none",background:T.gn,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:ff,height:34}}>Guardar</button>
+        </div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+          {monitoredAssets.map((a,i) => {
+            const sys = SYSTEMS.find(s=>s.id===a.system);
+            const daysSince = daysBetween(a.since, TODAY);
+            const hasEvent = !!a.lastEvent;
+            const isEditingThisNote = editingNote === a.system;
+            return (
+              <div key={i} style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${hasEvent?`${T.or}50`:T.brd}`,padding:16,display:"flex",flexDirection:"column"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:800,color:T.txB}}>{a.system}</div>
+                    <div style={{fontSize:13,color:T.txM}}>{sys?.name||a.system}</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <Badge color={hasEvent?T.or:T.gn} bg={hasEvent?`${T.or}18`:`${T.gn}18`}>{hasEvent?"Com ocorrência":"Monitorado"}</Badge>
+                    <button onClick={()=>removeAsset(a.system)} title="Remover ativo"
+                      style={{padding:"2px 6px",border:`1px solid ${T.brd}`,borderRadius:3,background:"#fff",color:T.rd,fontSize:11,cursor:"pointer",fontFamily:ff,flexShrink:0}}>✕</button>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flex:1}}>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Desde</div><div style={{fontSize:13,fontWeight:700,color:T.tx}}>{fmtDate(a.since)}</div></div>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Dias em monit.</div><div style={{fontSize:13,fontWeight:700,color:T.ac}}>{daysSince}</div></div>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Última ocorrência</div><div style={{fontSize:13,fontWeight:700,color:hasEvent?T.or:T.txM}}>{a.lastEvent?fmtDate(a.lastEvent):"Nenhuma"}</div></div>
+                  <div style={{background:"#f8f9fa",borderRadius:5,padding:"7px 9px"}}><div style={{fontSize:13,color:T.txM,textTransform:"uppercase",letterSpacing:0.5}}>Estado</div><Dot color={hasEvent?T.or:T.gn} label={hasEvent?"Activo":"Estável"}/></div>
+                </div>
+                <div style={{marginTop:12}}>
+                  {isEditingThisNote
+                    ? <div style={{display:"flex",gap:4}}>
+                        <input autoFocus defaultValue={a.notes}
+                          id={`note-input-${a.system}`}
+                          style={{flex:1,fontSize:13,padding:"5px 7px",border:`1px solid ${T.brd}`,borderRadius:4,color:T.tx,background:"#fff"}}
+                          onKeyDown={e=>{
+                            if(e.key==="Enter"){updateAssetNote(a.system,e.target.value);setEditingNote(null);}
+                            if(e.key==="Escape"){setEditingNote(null);}
+                          }}
+                        />
+                        <button onClick={()=>{const v=document.getElementById(`note-input-${a.system}`).value;updateAssetNote(a.system,v);setEditingNote(null);}}
+                          style={{padding:"5px 9px",borderRadius:4,border:"none",background:T.gn,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>✓</button>
+                        <button onClick={()=>setEditingNote(null)}
+                          style={{padding:"5px 9px",borderRadius:4,border:`1px solid ${T.brd}`,background:"#fff",color:T.txM,fontSize:13,cursor:"pointer"}}>✕</button>
+                      </div>
+                    : <div style={{display:"flex",alignItems:"flex-start",gap:4}}>
+                        {a.notes
+                          ? <div style={{flex:1,fontSize:13,color:T.txM,padding:"5px 7px",background:"#f8f9fa",borderRadius:4,borderLeft:`2px solid ${T.or}`,cursor:"pointer"}}
+                              onClick={()=>setEditingNote(a.system)}
+                              title="Clique para editar">{a.notes}</div>
+                          : <button onClick={()=>setEditingNote(a.system)}
+                              style={{flex:1,fontSize:13,color:T.txM,padding:"5px 7px",background:"#f8f9fa",borderRadius:4,border:`1px dashed ${T.brd}`,cursor:"pointer",textAlign:"left"}}>+ Adicionar observação</button>
+                        }
+                        {a.notes&&<button onClick={()=>updateAssetNote(a.system,"")}
+                          style={{padding:"4px 7px",borderRadius:4,border:`1px solid ${T.brd}`,background:"#fff",color:T.rd,fontSize:12,cursor:"pointer",flexShrink:0}} title="Remover observação">✕</button>}
+                      </div>
+                  }
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>}
+
+      {/* ═══ ANÁLISE ═══ */}
+      {tab==="analise"&&<div data-tab="analise">
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14}}>
+          {/* Volume por Tipo */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Volume por Tipo</div>
+            <Donut data={[{v:stats.prev,c:T.bl},{v:stats.corr,c:T.or},{v:stats.pred,c:T.pu}]}/>
+            <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:10}}>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.bl}}/>Preventiva ({stats.prev})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.or}}/>Corretiva ({stats.corr})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.pu}}/>Preditiva ({stats.pred})</span>
+            </div>
+          </div>
+          {/* Estado de Manutenção */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Estado de Manutenção</div>
+            <Donut data={[{v:stats.done,c:T.gn},{v:stats.sched,c:T.yl},{v:stats.cancel,c:T.rd}]}/>
+            <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:10}}>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.gn}}/>Realizada ({stats.done})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.yl}}/>Agendada ({stats.sched})</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.rd}}/>Cancelada ({stats.cancel})</span>
+            </div>
+          </div>
+          {/* Conclusão após Manutenção */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Conclusão após Manutenção</div>
+            {(()=>{
+              const agendar=wo.filter(w=>w.conclusion?.includes("Agendar")).length;
+              const apto=wo.filter(w=>w.conclusion?.includes("Apto")||w.disposition?.includes("Apto")).length;
+              const descarte=wo.filter(w=>w.disposition?.toLowerCase().includes("descarte")).length;
+              const subst=wo.filter(w=>w.conclusion?.includes("Substituição")).length;
+              return <>
+                <Donut data={[{v:agendar,c:T.bl},{v:apto,c:T.gn},{v:descarte,c:T.rd},{v:subst,c:T.or}]}/>
+                <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:10}}>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.bl}}/>Agendar ({agendar})</span>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.gn}}/>Apto ({apto})</span>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.rd}}/>Descarte ({descarte})</span>
+                  <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:2}}><span style={{width:5,height:5,borderRadius:1,background:T.or}}/>Subst. peças ({subst})</span>
+                </div>
+              </>;
+            })()}
+          </div>
+          {/* Troca de Peças */}
+          <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,textAlign:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Necessário Troca de Peças</div>
+            <Donut data={[{v:stats.partsNo||wo.filter(w=>w.parts==="Não").length,c:T.bl},{v:stats.partsYes||wo.filter(w=>w.parts==="Sim").length,c:T.or}]}/>
+            <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:10}}>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.bl}}/>Não</span>
+              <span style={{fontSize:13,color:T.txM,display:"flex",alignItems:"center",gap:3}}><span style={{width:6,height:6,borderRadius:1,background:T.or}}/>Sim</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Resumo Mensal Table */}
+        <div style={{background:"#fff",borderRadius:6,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`1px solid ${T.brd}`,padding:16,marginTop:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:T.txM,textTransform:"uppercase",letterSpacing:0.8,marginBottom:10}}>Resumo e Previsões — 2026</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+              <thead><tr>
+                <th style={{textAlign:"left",padding:"5px 8px",color:T.txM,fontSize:13,borderBottom:`1px solid ${T.brd}`}}>Tipo</th>
+                {MONTH_KEYS.map(m=><th key={m} style={{textAlign:"center",padding:"5px 4px",color:T.txM,fontSize:13,borderBottom:`1px solid ${T.brd}`}}>{m}</th>)}
+                <th style={{textAlign:"center",padding:"5px 6px",color:T.txB,fontSize:13,fontWeight:800,borderBottom:`1px solid ${T.brd}`}}>Total</th>
+              </tr></thead>
+              <tbody>
+                {[["Total de Actividades","total",T.txB],["Preventiva","prev",T.bl],["Corretiva","corr",T.or],["Preditiva","pred",T.pu]].map(([label,key,color])=>(
+                  <tr key={key}>
+                    <td style={{padding:"5px 8px",fontWeight:600,color,borderBottom:`1px solid ${T.brd}`}}>{label}</td>
+                    {monthStats.map((m,i)=><td key={i} style={{textAlign:"center",padding:"5px 4px",color:m[key]>0?color:T.txM,fontWeight:m[key]>0?700:400,borderBottom:`1px solid ${T.brd}`}}>{m[key]}</td>)}
+                    <td style={{textAlign:"center",padding:"5px 6px",fontWeight:800,color,borderBottom:`1px solid ${T.brd}`}}>{monthStats.reduce((s,m)=>s+m[key],0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>}
+
+      </div>
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
